@@ -25,7 +25,7 @@ const menuItems = [
     icon: <FiUsers size={20} />,
     submenu: [
       {
-        name: "Tüm Kullanıcılar",
+        name: "Tüm Kullanıcılar deneme",
         to: "/admin/users",
         icon: <MdOutlinePeopleAlt size={18} />,
       },
