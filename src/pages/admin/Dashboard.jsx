@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { FiEdit2, FiTrash2 } from "react-icons/fi";
+import AdminHeader from "@/components/AdminHeader/AdminHeader";
 
 const tableData = [
   { id: 4, name: "Volkan Kukul", email: "volkan@gmail.com", role: "Admin" },
@@ -27,25 +28,12 @@ const Dashboard = () => {
 
   return (
     <>
-      <motion.header
-        initial={{ y: -30, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2, duration: 0.5 }}
-        className="mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
-      >
-        <h1 className="text-3xl font-bold text-gray-800">Panel</h1>
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-blue-200 flex items-center justify-center font-bold text-blue-700">
-            A
-          </div>
-        </div>
-      </motion.header>
-
+      <AdminHeader title="Panel" />
       {/* Example Cards */}
       <motion.section
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.4, duration: 0.5 }}
+        transition={{ delay: 0.1, duration: 0.5 }}
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10"
       >
         {[1, 2, 3, 4].map((i) => (
@@ -64,7 +52,7 @@ const Dashboard = () => {
       <motion.section
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6, duration: 0.5 }}
+        transition={{ delay: 0.3, duration: 0.5 }}
         className="bg-white rounded-xl shadow-md p-4 md:p-8 min-h-[300px]"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
@@ -137,7 +125,7 @@ const Dashboard = () => {
                           : row.role}
                       </span>
                     </td>
-                    <td className="px-4 py-3 flex items-center gap-2 justify-center">
+                    <td className="px-4 py-3 flex gap-2 justify-center">
                       <button
                         className="p-2 rounded hover:bg-blue-100 text-blue-600 transition-colors"
                         title="Düzenle"

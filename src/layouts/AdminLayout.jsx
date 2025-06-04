@@ -13,51 +13,7 @@ import {
 } from "react-icons/fi";
 import { MdOutlinePersonAdd, MdOutlinePeopleAlt } from "react-icons/md";
 import { TbReportAnalytics } from "react-icons/tb";
-
-const menuItems = [
-  {
-    name: "Panel",
-    to: "/admin",
-    icon: <FiHome size={20} />,
-  },
-  {
-    name: "Kullanıcılar",
-    icon: <FiUsers size={20} />,
-    submenu: [
-      {
-        name: "Tüm Kullanıcılar deneme",
-        to: "/admin/users",
-        icon: <MdOutlinePeopleAlt size={18} />,
-      },
-      {
-        name: "Kullanıcı Ekle",
-        to: "/admin/users/add",
-        icon: <MdOutlinePersonAdd size={18} />,
-      },
-    ],
-  },
-  {
-    name: "Analitik",
-    icon: <FiBarChart2 size={20} />,
-    submenu: [
-      {
-        name: "Genel Bakış",
-        to: "/admin/analytics",
-        icon: <FiBarChart2 size={18} />,
-      },
-      {
-        name: "Raporlar",
-        to: "/admin/analytics/reports",
-        icon: <TbReportAnalytics size={18} />,
-      },
-    ],
-  },
-  {
-    name: "Ayarlar",
-    to: "/admin/settings",
-    icon: <FiSettings size={20} />,
-  },
-];
+import { menuItems } from "../pages/admin/Sidebar/menuItems";
 
 const AdminLayout = () => {
   const [openMenus, setOpenMenus] = useState({});
@@ -117,8 +73,9 @@ const AdminLayout = () => {
                           <NavLink
                             key={sub.name}
                             to={sub.to}
+                            end
                             className={({ isActive }) =>
-                              `flex items-center gap-2 px-2 py-1 rounded hover:bg-blue-100 text-gray-600 ${
+                              `flex items-center mt-1 gap-2 px-2 py-1 hover:ps-4 transition-all text-sm rounded hover:bg-blue-100 text-gray-600 ${
                                 isActive ? "bg-blue-100 font-semibold" : ""
                               }`
                             }

@@ -1,20 +1,32 @@
 import { createBrowserRouter } from "react-router-dom";
-import UsersLayout from "../pages/users/UsersLayout";
-import AdminLayout from "../pages/admin/AdminLayout";
 import Home from "../pages/users/Home";
 import Dashboard from "../pages/admin/Dashboard";
+import UsersLayout from "../layouts/UsersLayout";
+import AdminLayout from "../layouts/AdminLayout";
+import Schools from "../pages/admin/schools/Schools";
+import AddSchool from "../pages/admin/schools/AddSchool";
+import NotFound from "../pages/admin/not-found/NotFound";
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: <UsersLayout />,
-    children: [{ index: true, element: <Home /> }],
+    children: [
+      { index: true, element: <Home /> },
+      { path: "*", element: <NotFound /> },
+    ],
   },
   {
     path: "/admin",
     element: <AdminLayout />,
-    children: [{ path: "", element: <Dashboard /> }],
+    children: [
+      { index: true, element: <Dashboard /> },
+      { path: "schools", element: <Schools /> },
+      { path: "schools/add", element: <AddSchool /> },
+      { path: "*", element: <NotFound /> },
+    ],
   },
+  { path: "*", element: <NotFound /> },
 ]);
 
 export default router;
