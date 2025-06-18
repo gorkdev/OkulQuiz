@@ -280,7 +280,7 @@ const AddSchool = () => {
               control={control}
               render={({ field }) => (
                 <FormField
-                  label="Okul Müdürü"
+                  label="Yetkili Kişi"
                   error={errors.gorusulecekYetkili?.message}
                   delay={0.7}
                   {...field}
@@ -295,7 +295,7 @@ const AddSchool = () => {
               control={control}
               render={({ field }) => (
                 <FormField
-                  label="Müdür İletişim"
+                  label="Yetkili Telefon"
                   type="tel"
                   error={errors.yetkiliTelefon?.message}
                   placeholder="0555 555 55 55"
