@@ -60,7 +60,7 @@ const AddCredi = () => {
         </div>
       </div>
       {/* Okul kartları */}
-      <div className="space-y-2">
+      <div className="space-y-6">
         {loading ? (
           <div>Yükleniyor...</div>
         ) : filteredSchools.length === 0 ? (
