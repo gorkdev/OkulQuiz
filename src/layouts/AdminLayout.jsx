@@ -1,5 +1,5 @@
-import { Outlet, NavLink } from "react-router-dom";
-import { useState } from "react";
+import { Outlet } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FiHome,
@@ -18,6 +18,11 @@ import { menuItems } from "../pages/admin/Sidebar/menuItems";
 const AdminLayout = () => {
   const [openMenus, setOpenMenus] = useState({});
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    setCurrentPath(window.location.pathname);
+  }, []);
 
   const toggleMenu = (name) => {
     setOpenMenus((prev) => ({ ...prev, [name]: !prev[name] }));
@@ -70,37 +75,33 @@ const AdminLayout = () => {
                         className="pl-8 flex flex-col gap-1 overflow-hidden"
                       >
                         {item.submenu.map((sub) => (
-                          <NavLink
+                          <a
                             key={sub.name}
-                            to={sub.to}
-                            end
-                            className={({ isActive }) =>
-                              `flex items-center mt-1 gap-2 px-2 py-1 hover:ps-4 transition-all text-sm rounded hover:bg-blue-100 text-gray-600 ${
-                                isActive ? "bg-blue-100 font-semibold" : ""
-                              }`
-                            }
+                            href={sub.to}
+                            className={`flex items-center mt-1 gap-2 px-2 py-1 hover:ps-4 transition-all text-sm rounded hover:bg-blue-100 text-gray-600 ${
+                              currentPath === sub.to
+                                ? "bg-blue-100 font-semibold"
+                                : ""
+                            }`}
                           >
                             <span>{sub.icon}</span>
                             {sub.name}
-                          </NavLink>
+                          </a>
                         ))}
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </>
               ) : (
-                <NavLink
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors text-gray-700 font-medium ${
-                      isActive ? "bg-blue-100 font-semibold" : ""
-                    }`
-                  }
-                  end
+                <a
+                  href={item.to}
+                  className={`flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors text-gray-700 font-medium ${
+                    currentPath === item.to ? "bg-blue-100 font-semibold" : ""
+                  }`}
                 >
                   <span>{item.icon}</span>
                   {item.name}
-                </NavLink>
+                </a>
               )}
             </div>
           ))}
@@ -188,40 +189,37 @@ const AdminLayout = () => {
                               className="pl-8 flex flex-col gap-1 overflow-hidden"
                             >
                               {item.submenu.map((sub) => (
-                                <NavLink
+                                <a
                                   key={sub.name}
-                                  to={sub.to}
-                                  className={({ isActive }) =>
-                                    `flex items-center gap-2 px-2 py-1 rounded hover:bg-blue-100 text-gray-600 ${
-                                      isActive
-                                        ? "bg-blue-100 font-semibold"
-                                        : ""
-                                    }`
-                                  }
+                                  href={sub.to}
+                                  className={`flex items-center gap-2 px-2 py-1 rounded hover:bg-blue-100 text-gray-600 ${
+                                    currentPath === sub.to
+                                      ? "bg-blue-100 font-semibold"
+                                      : ""
+                                  }`}
                                   onClick={() => setMobileSidebarOpen(false)}
                                 >
                                   <span>{sub.icon}</span>
                                   {sub.name}
-                                </NavLink>
+                                </a>
                               ))}
                             </motion.div>
                           )}
                         </AnimatePresence>
                       </>
                     ) : (
-                      <NavLink
-                        to={item.to}
-                        className={({ isActive }) =>
-                          `flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors text-gray-700 font-medium ${
-                            isActive ? "bg-blue-100 font-semibold" : ""
-                          }`
-                        }
-                        end
+                      <a
+                        href={item.to}
+                        className={`flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors text-gray-700 font-medium ${
+                          currentPath === item.to
+                            ? "bg-blue-100 font-semibold"
+                            : ""
+                        }`}
                         onClick={() => setMobileSidebarOpen(false)}
                       >
                         <span>{item.icon}</span>
                         {item.name}
-                      </NavLink>
+                      </a>
                     )}
                   </div>
                 ))}

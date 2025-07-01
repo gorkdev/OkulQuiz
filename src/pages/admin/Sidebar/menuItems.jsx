@@ -4,6 +4,7 @@ import { IoIosAddCircleOutline } from "react-icons/io";
 import { IoSchoolSharp } from "react-icons/io5";
 import { MdOutlinePeopleAlt, MdOutlinePersonAdd } from "react-icons/md";
 import { TbReportAnalytics } from "react-icons/tb";
+import { GiTwoCoins } from "react-icons/gi";
 
 export const menuItems = [
   {
@@ -28,18 +29,18 @@ export const menuItems = [
     ],
   },
   {
-    name: "Analitik",
-    icon: <FiBarChart2 size={20} />,
+    name: "Krediler",
+    icon: <GiTwoCoins size={20} />,
     submenu: [
       {
-        name: "Genel Bakış",
-        to: "/admin/analytics",
-        icon: <FiBarChart2 size={18} />,
+        name: "Kredi Ekle",
+        to: "/admin/credits/add",
+        icon: <GiTwoCoins size={18} />,
       },
       {
-        name: "Raporlar",
-        to: "/admin/analytics/reports",
-        icon: <TbReportAnalytics size={18} />,
+        name: "Kredi Geçmişi",
+        to: "/admin/credits",
+        icon: <GiTwoCoins size={18} />,
       },
     ],
   },

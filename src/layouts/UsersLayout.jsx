@@ -1,12 +1,33 @@
-import { Outlet, NavLink } from "react-router-dom";
+import { Outlet } from "react-router-dom";
+import { useState, useEffect } from "react";
 
 const UsersLayout = () => {
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    setCurrentPath(window.location.pathname);
+  }, []);
+
   return (
     <div>
       <header className="bg-blue-600 text-white p-4">
         <nav className="flex gap-4">
-          <NavLink to="/">Home</NavLink>
-          <NavLink to="/about">About</NavLink>
+          <a
+            href="/"
+            className={`hover:text-blue-200 transition-colors ${
+              currentPath === "/" ? "font-semibold text-blue-200" : ""
+            }`}
+          >
+            Home
+          </a>
+          <a
+            href="/about"
+            className={`hover:text-blue-200 transition-colors ${
+              currentPath === "/about" ? "font-semibold text-blue-200" : ""
+            }`}
+          >
+            About
+          </a>
         </nav>
       </header>
       <main className="p-6">

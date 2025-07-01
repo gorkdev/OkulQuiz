@@ -27,7 +27,7 @@ const FormTemplate = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="flex justify-end pt-6"
+          className="flex justify-center pt-6"
         >
           <button
             type="submit"

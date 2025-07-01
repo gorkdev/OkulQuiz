@@ -1,4 +1,4 @@
-import React, { forwardRef } from "react";
+import React, { forwardRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
 const FormField = forwardRef(
@@ -20,52 +20,114 @@ const FormField = forwardRef(
     },
     ref
   ) => {
-    const baseInputClass = `
-    w-full px-4 py-3
-    border border-[#DBE2EF]
-    rounded-md
-    bg-white
-    transition-all duration-300 ease-in-out
-    focus:outline-none 
-    focus:border-gray-400
-    focus:rounded-xl
-    ${error ? "border-red-400" : ""}
-    ${className}
-  `;
+    const [displayValue, setDisplayValue] = useState("");
 
-    const formatPhoneNumber = (value) => {
-      if (!value) return "";
-
-      // Sadece rakamları al
-      const numbers = value.replace(/\D/g, "");
-
-      // Format: 0555 555 55 55
-      const match = numbers.match(/^(\d{0,4})(\d{0,3})(\d{0,2})(\d{0,2})$/);
-
-      if (!match) return value;
-
-      let formatted = "";
-      if (match[1]) {
-        // İlk 4 rakam (başında 0 kontrolü)
-        formatted = match[1].startsWith("0") ? match[1] : "0" + match[1];
+    useEffect(() => {
+      if (type === "date" && value) {
+        // ISO formatındaki tarihi dd/MM/yyyy formatına çevir
+        const date = new Date(value);
+        if (!isNaN(date.getTime())) {
+          const day = date.getDate().toString().padStart(2, "0");
+          const month = (date.getMonth() + 1).toString().padStart(2, "0");
+          const year = date.getFullYear();
+          setDisplayValue(`${day}/${month}/${year}`);
+        }
       }
-      if (match[2]) formatted += " " + match[2];
-      if (match[3]) formatted += " " + match[3];
-      if (match[4]) formatted += " " + match[4];
+    }, [value, type]);
 
-      return formatted.trim();
+    const baseInputClass = `
+      w-full px-4 py-3
+      border border-[#DBE2EF]
+      rounded-md
+      bg-white
+      transition-all duration-300 ease-in-out
+      focus:outline-none 
+      focus:border-gray-400
+      focus:rounded-xl
+      ${error ? "border-red-400" : ""}
+      ${className}
+    `;
+
+    const formatDateInput = (input) => {
+      // Tüm non-digit karakterleri kaldır
+      let numbers = input.replace(/\D/g, "");
+
+      // Gereksiz sıfırları kaldır (örneğin 00/05/2023 -> 0/05/2023)
+      if (numbers.length > 0 && numbers[0] === "0" && numbers[1] === "0") {
+        numbers = numbers.substring(1);
+      }
+
+      // Girdiyi parçalara ayır
+      let day = numbers.substring(0, 2);
+      let month = numbers.substring(2, 4);
+      let year = numbers.substring(4, 8);
+
+      // Formatı oluştur
+      let formatted = "";
+      if (day.length > 0) {
+        formatted = day;
+        if (month.length > 0) {
+          formatted += `/${month}`;
+          if (year.length > 0) {
+            formatted += `/${year}`;
+          }
+        }
+      }
+
+      return formatted;
     };
 
-    const handlePhoneChange = (e) => {
-      if (type === "tel") {
-        const formatted = formatPhoneNumber(e.target.value);
-        onChange?.({
-          ...e,
-          target: {
-            ...e.target,
-            value: formatted,
-          },
-        });
+    const parseDateString = (dateString) => {
+      if (!dateString) return null;
+
+      const parts = dateString.split("/");
+      if (parts.length !== 3) return null;
+
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+
+      // Geçerli bir tarih mi kontrol et
+      const date = new Date(year, month, day);
+      if (
+        date.getDate() !== day ||
+        date.getMonth() !== month ||
+        date.getFullYear() !== year
+      ) {
+        return null;
+      }
+
+      return date;
+    };
+
+    const handleChange = (e) => {
+      const value = e.target.value;
+
+      if (type === "date") {
+        const formatted = formatDateInput(value);
+        setDisplayValue(formatted);
+
+        // Tarihi parse et ve ISO formatına çevir
+        const parsedDate = parseDateString(formatted);
+        if (parsedDate) {
+          const isoDate = parsedDate.toISOString().split("T")[0];
+          onChange?.({
+            ...e,
+            target: {
+              ...e.target,
+              value: isoDate,
+            },
+          });
+        } else if (formatted.length === 10) {
+          // Geçersiz tarih ama tam uzunlukta
+          onChange?.({
+            ...e,
+            target: {
+              ...e.target,
+              value: "",
+            },
+          });
+        }
       } else {
         onChange?.(e);
       }
@@ -78,7 +140,7 @@ const FormField = forwardRef(
             ref={ref}
             name={name}
             value={value}
-            onChange={handlePhoneChange}
+            onChange={handleChange}
             required={required}
             rows={rows || 3}
             className={baseInputClass}
@@ -94,7 +156,7 @@ const FormField = forwardRef(
             ref={ref}
             name={name}
             value={value}
-            onChange={handlePhoneChange}
+            onChange={handleChange}
             required={required}
             className={`${baseInputClass} appearance-none bg-no-repeat bg-right-1 pr-10`}
             style={{
@@ -119,7 +181,7 @@ const FormField = forwardRef(
             type="text"
             name={name}
             value={value}
-            onChange={handlePhoneChange}
+            onChange={handleChange}
             required={required}
             className={baseInputClass}
             placeholder="0555 555 55 55"
@@ -134,11 +196,12 @@ const FormField = forwardRef(
           ref={ref}
           type={type}
           name={name}
-          value={value}
-          onChange={handlePhoneChange}
+          value={type === "date" ? displayValue : value}
+          onChange={handleChange}
           required={required}
           className={baseInputClass}
-          placeholder={placeholder}
+          placeholder={type === "date" ? "dd/MM/yyyy" : placeholder}
+          maxLength={type === "date" ? 10 : undefined}
           {...props}
         />
       );

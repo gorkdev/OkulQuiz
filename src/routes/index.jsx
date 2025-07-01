@@ -6,6 +6,8 @@ import AdminLayout from "../layouts/AdminLayout";
 import Schools from "../pages/admin/schools/Schools";
 import AddSchool from "../pages/admin/schools/AddSchool";
 import NotFound from "../pages/admin/not-found/NotFound";
+import Credits from "../pages/admin/credits/Credits";
+import AddCredi from "../pages/admin/credits/AddCredi";
 
 const router = createBrowserRouter([
   {
@@ -23,6 +25,8 @@ const router = createBrowserRouter([
       { index: true, element: <Dashboard /> },
       { path: "schools", element: <Schools /> },
       { path: "schools/add", element: <AddSchool /> },
+      { path: "credits", element: <Credits /> },
+      { path: "credits/add", element: <AddCredi /> },
       { path: "*", element: <NotFound /> },
     ],
   },
