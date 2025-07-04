@@ -4,6 +4,8 @@ import {
   getSchoolsPaginated,
   updateSchool,
   deleteSchool,
+  setSchoolPassive,
+  setSchoolActive,
 } from "@/services/firebase/schoolService";
 import { toast } from "react-toastify";
 import {
@@ -21,6 +23,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import FormField from "@/components/FormTemplate/FormField";
 import Loader from "@/components/Loader";
 import CustomDropdown from "@/components/FormTemplate/CustomDropdown";
+import { CiPause1 } from "react-icons/ci";
+import { GoCheck } from "react-icons/go";
 
 const Schools = () => {
   const [schools, setSchools] = useState([]);
@@ -173,6 +177,7 @@ const Schools = () => {
         await deleteSchool(selectedSchool.id);
         setSchools(schools.filter((school) => school.id !== selectedSchool.id));
         toast.success("Okul başarıyla silindi!");
+
         handleCloseModal();
       } catch (error) {
         console.error("Okul silinirken hata oluştu:", error);
@@ -180,6 +185,46 @@ const Schools = () => {
       } finally {
         setIsSaving(false);
       }
+    }
+  };
+
+  const handleSetPassive = async () => {
+    try {
+      setIsSaving(true);
+      await setSchoolPassive(editedSchool.id);
+      const updated = { ...editedSchool, durum: "pasif" };
+      setSchools(
+        schools.map((school) =>
+          school.id === editedSchool.id ? updated : school
+        )
+      );
+      toast.success("Okul pasif yapıldı!");
+      setEditedSchool(updated);
+    } catch (error) {
+      console.error("Okul pasif yapılırken hata oluştu:", error);
+      toast.error("Okul pasif yapılırken bir hata oluştu!");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSetActive = async () => {
+    try {
+      setIsSaving(true);
+      await setSchoolActive(editedSchool.id);
+      const updated = { ...editedSchool, durum: "aktif" };
+      setSchools(
+        schools.map((school) =>
+          school.id === editedSchool.id ? updated : school
+        )
+      );
+      toast.success("Okul aktif yapıldı!");
+      setEditedSchool(updated);
+    } catch (error) {
+      console.error("Okul aktif yapılırken hata oluştu:", error);
+      toast.error("Okul aktif yapılırken bir hata oluştu!");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -475,6 +520,25 @@ const Schools = () => {
                       <FiTrash2 className="mr-2" />
                       Okulu Sil
                     </button>
+                    {editedSchool?.durum === "aktif" ? (
+                      <button
+                        onClick={handleSetPassive}
+                        disabled={isSaving}
+                        className="cursor-pointer flex items-center px-4 py-2 text-yellow-700 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors shadow-sm"
+                      >
+                        <CiPause1 className="mr-2" />
+                        Pasif Yap
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleSetActive}
+                        disabled={isSaving}
+                        className="cursor-pointer flex items-center px-4 py-2 text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors shadow-sm"
+                      >
+                        <GoCheck className="mr-2" />
+                        Aktif Yap
+                      </button>
+                    )}
                     <button
                       onClick={handleSave}
                       disabled={isSaving}
@@ -483,7 +547,6 @@ const Schools = () => {
                       }`}
                     >
                       <FiSave className="mr-2" />
-
                       {isSaving ? "Kaydediliyor..." : "Kaydet"}
                     </button>
                   </div>
