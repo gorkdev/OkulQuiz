@@ -27,7 +27,7 @@ const AddCredi = () => {
         setSchools(data);
       } catch (err) {
         // Hata yönetimi
-        alert("Okullar yüklenirken hata olmuştur");
+        alert("Okullar yüklenirken hata olmuştur.");
       } finally {
         setLoading(false);
       }
