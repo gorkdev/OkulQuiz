@@ -1,10 +1,22 @@
 import { CiBoxList } from "react-icons/ci";
-import { FiBarChart2, FiHome, FiSettings, FiUsers } from "react-icons/fi";
-import { IoIosAddCircleOutline } from "react-icons/io";
+import {
+  FiBarChart2,
+  FiHome,
+  FiLogIn,
+  FiSettings,
+  FiUsers,
+} from "react-icons/fi";
+import { IoIosAddCircleOutline, IoMdAdd } from "react-icons/io";
 import { IoSchoolSharp } from "react-icons/io5";
-import { MdOutlinePeopleAlt, MdOutlinePersonAdd } from "react-icons/md";
+import {
+  MdHistory,
+  MdOutlinePeopleAlt,
+  MdOutlinePersonAdd,
+} from "react-icons/md";
 import { TbReportAnalytics } from "react-icons/tb";
 import { GiTwoCoins } from "react-icons/gi";
+import { LiaCoinsSolid, LiaSchoolSolid } from "react-icons/lia";
+import { PiHandCoinsLight } from "react-icons/pi";
 
 export const menuItems = [
   {
@@ -14,7 +26,7 @@ export const menuItems = [
   },
   {
     name: "Okullar",
-    icon: <IoSchoolSharp size={20} />,
+    icon: <LiaSchoolSolid size={20} />,
     submenu: [
       {
         name: "Tüm Okullar",
@@ -30,19 +42,24 @@ export const menuItems = [
   },
   {
     name: "Krediler",
-    icon: <GiTwoCoins size={20} />,
+    icon: <PiHandCoinsLight size={20} />,
     submenu: [
       {
         name: "Kredi Ekle",
         to: "/admin/credits/add",
-        icon: <GiTwoCoins size={18} />,
+        icon: <CiBoxList size={18} />,
       },
       {
         name: "Kredi Geçmişi",
         to: "/admin/credits",
-        icon: <GiTwoCoins size={18} />,
+        icon: <MdHistory size={18} />,
       },
     ],
+  },
+  {
+    name: "Log Geçmişi",
+    to: "/admin/logs",
+    icon: <MdHistory size={20} />,
   },
   {
     name: "Ayarlar",

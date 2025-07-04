@@ -13,6 +13,7 @@ import {
   getDoc,
   where,
 } from "firebase/firestore";
+import { addLog } from "./logService";
 
 /**
  * Yeni okul ekler.
@@ -28,6 +29,10 @@ export const addSchool = async (schoolData) => {
   // Burada ister ekstra validasyon yapabilirsin.
 
   const docRef = await addDoc(collection(db, "Okullar"), schoolData);
+  addLog({
+    title: "Yeni Bir Okul Eklendi",
+    details: `${schoolData.okulAdi} adlı okul sisteme eklendi.`,
+  });
   return docRef.id;
 };
 
@@ -55,6 +60,11 @@ export const getSchools = async () => {
       ...doc.data(),
     }));
 
+    addLog({
+      title: "Okul Listelendi",
+      details: `Okul listesi getirildi.`,
+    });
+
     console.log("Dönüştürülen okul verileri:", schools);
     return schools;
   } catch (error) {
@@ -67,6 +77,10 @@ export const updateSchool = async (schoolId, schoolData) => {
   try {
     const schoolRef = doc(db, "Okullar", schoolId);
     await updateDoc(schoolRef, schoolData);
+    addLog({
+      title: "Okul Güncellendi",
+      details: `${schoolData.okulAdi} adlı okul güncellendi.`,
+    });
   } catch (error) {
     console.error("Error updating school:", error);
     throw error;
@@ -77,6 +91,10 @@ export const deleteSchool = async (schoolId) => {
   try {
     const schoolRef = doc(db, "Okullar", schoolId);
     await deleteDoc(schoolRef);
+    addLog({
+      title: "Okul Silindi",
+      details: `${schoolId} adlı okul silindi.`,
+    });
   } catch (error) {
     console.error("Error deleting school:", error);
     throw error;
@@ -147,4 +165,48 @@ export const isUsernameTaken = async (username) => {
   );
   const snapshot = await getDocs(q);
   return !snapshot.empty;
+};
+
+/**
+ * Okulu pasif yapar.
+ * @param {string} schoolId - Pasif yapılacak okulun ID'si
+ * @returns {Promise<void>}
+ */
+export const setSchoolPassive = async (schoolId) => {
+  try {
+    const schoolRef = doc(db, "Okullar", schoolId);
+    // Okulun adını almak için önce dokümanı çek
+    const schoolSnap = await getDoc(schoolRef);
+    const okulAdi = schoolSnap.exists() ? schoolSnap.data().okulAdi : schoolId;
+    await updateDoc(schoolRef, { durum: "pasif" });
+    addLog({
+      title: "Okul Pasif Yapıldı",
+      details: `${okulAdi} adlı okul pasif yapıldı.`,
+    });
+  } catch (error) {
+    console.error("Okul pasif yapılırken hata oluştu:", error);
+    throw error;
+  }
+};
+
+/**
+ * Okulu aktif yapar.
+ * @param {string} schoolId - Aktif yapılacak okulun ID'si
+ * @returns {Promise<void>}
+ */
+export const setSchoolActive = async (schoolId) => {
+  try {
+    const schoolRef = doc(db, "Okullar", schoolId);
+    // Okulun adını almak için önce dokümanı çek
+    const schoolSnap = await getDoc(schoolRef);
+    const okulAdi = schoolSnap.exists() ? schoolSnap.data().okulAdi : schoolId;
+    await updateDoc(schoolRef, { durum: "aktif" });
+    addLog({
+      title: "Okul Aktif Yapıldı",
+      details: `${okulAdi} adlı okul aktif yapıldı.`,
+    });
+  } catch (error) {
+    console.error("Okul aktif yapılırken hata oluştu:", error);
+    throw error;
+  }
 };
