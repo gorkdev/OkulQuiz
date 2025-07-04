@@ -27,7 +27,7 @@ const AddCredi = () => {
         setSchools(data);
       } catch (err) {
         // Hata yönetimi
-        alert("Okullar yüklenirken hata oluştu");
+        alert("Okullar yüklenirken hata oluştu.");
       } finally {
         setLoading(false);
       }
@@ -44,7 +44,7 @@ const AddCredi = () => {
             <div>
               <FormField
                 type="text"
-                placeholder="Okul ara..."
+                placeholder="Okul ...."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 icon="search"
