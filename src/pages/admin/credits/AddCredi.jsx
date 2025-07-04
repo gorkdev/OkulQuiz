@@ -44,7 +44,7 @@ const AddCredi = () => {
             <div>
               <FormField
                 type="text"
-                placeholder="Okul ara..."
+                placeholder="Okul ...."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 icon="search"
