@@ -5,6 +5,7 @@ import {
   getSchools,
   updateSchool,
 } from "../../../services/firebase/schoolService";
+import Loader from "../../../components/Loader";
 
 const AddCredi = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -103,7 +104,7 @@ const AddCredi = () => {
       {/* Okul kartları */}
       <div className="space-y-4">
         {loading ? (
-          <div>Yükleniyor...</div>
+          <Loader className="h-24" />
         ) : filteredSchools.length === 0 ? (
           <div>Hiç okul bulunamadı.</div>
         ) : (
@@ -123,7 +124,8 @@ const AddCredi = () => {
                   className="bg-blue-500 text-white px-3 py-1 rounded cursor-pointer transition-transform duration-200 hover:scale-110"
                   onClick={() => {
                     setModalSchool(school);
-                    setModalInitialCredit(school.kredi || "");
+                    setModalInitialCredit("");
+                    setModalCredit("");
                     setModalOpen(true);
                   }}
                 >
@@ -153,7 +155,7 @@ const AddCredi = () => {
           </h2>
           {typeof modalSchool?.kredi !== "undefined" && (
             <div className="text-center mb-4">
-              <span className="inline-block text-2xl font-bold text-blue-700 bg-blue-50 px-4 py-2 rounded-lg shadow-sm">
+              <span className="inline-block text-base font-bold text-blue-700 bg-blue-50 px-4 py-2 rounded-lg shadow-sm">
                 Mevcut Kredi: {modalSchool.kredi}
               </span>
             </div>
@@ -164,48 +166,54 @@ const AddCredi = () => {
             placeholder="Kredi miktarı giriniz"
             value={modalCredit}
             onChange={(e) => setModalCredit(e.target.value)}
-            className="mb-2"
+            className="mb-2 hide-number-arrows"
             min={0}
             max={999999}
             autoFocus
           />
           <div className="flex justify-center gap-4 mb-4">
-            <button
-              className="bg-blue-500 hover:bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl font-bold shadow transition-transform duration-150 hover:scale-110 cursor-pointer"
-              onClick={() => {
-                if (!modalSchool) return;
-                if (modalCredit === "" || isNaN(Number(modalCredit))) return;
-                const mevcut =
-                  newCredit !== null
-                    ? newCredit
-                    : Number(modalSchool.kredi) || 0;
-                const girilen = Number(modalCredit);
-                setNewCredit(mevcut + girilen);
-                setModalCredit("");
-              }}
-              type="button"
-              title="Ekle"
-            >
-              +
-            </button>
-            <button
-              className="bg-red-500 hover:bg-red-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl font-bold shadow transition-transform duration-150 hover:scale-110 cursor-pointer"
-              onClick={() => {
-                if (!modalSchool) return;
-                if (modalCredit === "" || isNaN(Number(modalCredit))) return;
-                const mevcut =
-                  newCredit !== null
-                    ? newCredit
-                    : Number(modalSchool.kredi) || 0;
-                const girilen = Number(modalCredit);
-                setNewCredit(mevcut - girilen);
-                setModalCredit("");
-              }}
-              type="button"
-              title="Çıkar"
-            >
-              –
-            </button>
+            <div className="flex flex-col justify-center items-center gap-4">
+              <div className="flex flex-row justify-center items-center gap-4">
+                <button
+                  className="bg-blue-500 hover:bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl font-bold shadow transition-transform duration-150 hover:scale-110 cursor-pointer"
+                  style={{ lineHeight: 1 }}
+                  onClick={() => {
+                    if (!modalSchool) return;
+                    if (modalCredit === "" || isNaN(Number(modalCredit))) return;
+                    const mevcut =
+                      newCredit !== null
+                        ? newCredit
+                        : Number(modalSchool.kredi) || 0;
+                    const girilen = Number(modalCredit);
+                    setNewCredit(mevcut + girilen);
+                    setModalCredit("");
+                  }}
+                  type="button"
+                  title="Ekle"
+                >
+                  <span className="flex items-center justify-center w-full h-full relative -top-1">+</span>
+                </button>
+                <button
+                  className="bg-red-500 hover:bg-red-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl font-bold shadow transition-transform duration-150 hover:scale-110 cursor-pointer"
+                  style={{ lineHeight: 1 }}
+                  onClick={() => {
+                    if (!modalSchool) return;
+                    if (modalCredit === "" || isNaN(Number(modalCredit))) return;
+                    const mevcut =
+                      newCredit !== null
+                        ? newCredit
+                        : Number(modalSchool.kredi) || 0;
+                    const girilen = Number(modalCredit);
+                    setNewCredit(mevcut - girilen);
+                    setModalCredit("");
+                  }}
+                  type="button"
+                  title="Çıkar"
+                >
+                  <span className="flex items-center justify-center w-full h-full relative -top-1">–</span>
+                </button>
+              </div>
+            </div>
           </div>
           {/* Yeni kredi büyük şekilde gösterilsin, sadece input boş değilse ve newCredit null değilse */}
           {modalCredit === "" && newCredit === null
@@ -213,7 +221,7 @@ const AddCredi = () => {
             : newCredit !== null && (
                 <div className="text-center mb-4">
                   <span
-                    className={`inline-block text-3xl font-bold px-6 py-3 rounded-lg shadow-sm ${
+                    className={`inline-block text-base font-bold px-6 py-3 rounded-lg shadow-sm ${
                       newCredit < 0
                         ? "text-red-500 bg-red-50"
                         : "text-green-700 bg-green-50"
@@ -268,6 +276,16 @@ const AddCredi = () => {
           </div>
         </div>
       </div>
+      <style jsx global>{`
+        input[type=number].hide-number-arrows::-webkit-inner-spin-button, 
+        input[type=number].hide-number-arrows::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type=number].hide-number-arrows {
+          -moz-appearance: textfield;
+        }
+      `}</style>
     </div>
   );
 };
