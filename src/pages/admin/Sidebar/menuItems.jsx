@@ -1,6 +1,7 @@
 import { CiBoxList } from "react-icons/ci";
 import {
   FiBarChart2,
+  FiBookOpen,
   FiHome,
   FiLogIn,
   FiSettings,
@@ -15,8 +16,14 @@ import {
 } from "react-icons/md";
 import { TbReportAnalytics } from "react-icons/tb";
 import { GiTwoCoins } from "react-icons/gi";
-import { LiaCoinsSolid, LiaSchoolSolid } from "react-icons/lia";
-import { PiHandCoinsLight } from "react-icons/pi";
+import {
+  LiaCoinsSolid,
+  LiaListSolid,
+  LiaQuestionSolid,
+  LiaSchoolSolid,
+} from "react-icons/lia";
+import { PiHandCoins, PiHandCoinsLight, PiHandCoinsThin } from "react-icons/pi";
+import { BiCategory } from "react-icons/bi";
 
 export const menuItems = [
   {
@@ -42,17 +49,49 @@ export const menuItems = [
   },
   {
     name: "Krediler",
-    icon: <PiHandCoinsLight size={20} />,
+    icon: <PiHandCoins size={20} />,
     submenu: [
       {
         name: "Kredi Ekle",
         to: "/admin/credits/add",
-        icon: <CiBoxList size={18} />,
+        icon: <IoIosAddCircleOutline size={18} />,
       },
       {
         name: "Kredi Geçmişi",
         to: "/admin/credits",
         icon: <MdHistory size={18} />,
+      },
+    ],
+  },
+  {
+    name: "Kategoriler",
+    icon: <BiCategory size={20} />,
+    submenu: [
+      {
+        name: "Tüm Kategoriler",
+        to: "/admin/categories",
+        icon: <CiBoxList size={18} />,
+      },
+      {
+        name: "Yeni Kategori Ekle",
+        to: "/admin/categories/add",
+        icon: <IoIosAddCircleOutline size={18} />,
+      },
+    ],
+  },
+  {
+    name: "Sorular",
+    icon: <LiaQuestionSolid size={20} />,
+    submenu: [
+      {
+        name: "Tüm Sorular",
+        to: "/admin/questions",
+        icon: <CiBoxList size={18} />,
+      },
+      {
+        name: "Yeni Soru Ekle",
+        to: "/admin/questions/add",
+        icon: <IoIosAddCircleOutline size={18} />,
       },
     ],
   },

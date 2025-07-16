@@ -9,6 +9,9 @@ import NotFound from "../pages/admin/not-found/NotFound";
 import Credits from "../pages/admin/credits/Credits";
 import AddCredi from "../pages/admin/credits/AddCredi";
 import Logs from "../pages/admin/logs/Logs";
+import AddNewQuestion from "../pages/admin/questions/AddNewQuestion";
+import AddNewCategory from "../pages/admin/categories/AddNewCategory";
+import Categories from "../pages/admin/categories/Categories";
 
 const router = createBrowserRouter([
   {
@@ -28,6 +31,10 @@ const router = createBrowserRouter([
       { path: "schools/add", element: <AddSchool /> },
       { path: "credits", element: <Credits /> },
       { path: "credits/add", element: <AddCredi /> },
+      { path: "categories", element: <Categories /> },
+      { path: "categories/add", element: <AddNewCategory /> },
+      { path: "questions", element: <AddCredi /> },
+      { path: "questions/add", element: <AddNewQuestion /> },
       { path: "logs", element: <Logs /> },
       { path: "*", element: <NotFound /> },
     ],
