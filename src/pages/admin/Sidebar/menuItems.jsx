@@ -22,7 +22,12 @@ import {
   LiaQuestionSolid,
   LiaSchoolSolid,
 } from "react-icons/lia";
-import { PiHandCoins, PiHandCoinsLight, PiHandCoinsThin } from "react-icons/pi";
+import {
+  PiExam,
+  PiHandCoins,
+  PiHandCoinsLight,
+  PiHandCoinsThin,
+} from "react-icons/pi";
 import { BiCategory } from "react-icons/bi";
 
 export const menuItems = [
@@ -60,6 +65,22 @@ export const menuItems = [
         name: "Kredi Geçmişi",
         to: "/admin/credits",
         icon: <MdHistory size={18} />,
+      },
+    ],
+  },
+  {
+    name: "Quizler",
+    icon: <PiExam size={20} />,
+    submenu: [
+      {
+        name: "Tüm Quizler",
+        to: "/admin/quiz",
+        icon: <CiBoxList size={18} />,
+      },
+      {
+        name: "Yeni Quiz Ekle",
+        to: "/admin/quiz/add",
+        icon: <IoIosAddCircleOutline size={18} />,
       },
     ],
   },

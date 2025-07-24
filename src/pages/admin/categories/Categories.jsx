@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import AdminHeader from "@/components/AdminHeader/AdminHeader";
 import {
-  getCategoriesPaginated,
+  getAllCategoriesPaginated,
   updateCategory,
   deleteCategory,
   setCategoryActive,
@@ -15,11 +15,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import FormField from "@/components/FormTemplate/FormField";
 import CustomDropdown from "@/components/FormTemplate/CustomDropdown";
 import Loader from "@/components/Loader";
+import { getQuestionCountByCategoryName } from "@/services/firebase/questionService";
+import KategoriFormu from "./KategoriFormu";
+import KategoriDetayFormu from "./KategoriDetayFormu";
 
 const statusOptions = [
   { value: "aktif", label: "Aktif" },
   { value: "pasif", label: "Pasif" },
 ];
+
+// Türkçe harf duyarsız karşılaştırma için yardımcı fonksiyon
+function normalizeString(str) {
+  return String(str)
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .replace(/İ/g, "i");
+}
 
 const Categories = () => {
   const [categories, setCategories] = useState([]);
@@ -34,11 +45,13 @@ const Categories = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadingRef = useRef(null);
   const observer = useRef(null);
+  const [categoryQuestionCounts, setCategoryQuestionCounts] = useState({});
+  const [editMode, setEditMode] = useState(false);
 
   // Arama fonksiyonu
   const filteredCategories = categories.filter((cat) =>
     Object.values(cat).some((value) =>
-      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+      normalizeString(value).includes(normalizeString(searchTerm))
     )
   );
 
@@ -47,11 +60,24 @@ const Categories = () => {
     if (isLoadingMore || !hasMore) return;
     try {
       setIsLoadingMore(true);
-      const result = await getCategoriesPaginated(6, lastDocId);
+      const result = await getAllCategoriesPaginated(6, lastDocId);
       if (result.categories.length > 0) {
         setCategories((prev) => [...prev, ...result.categories]);
         setLastDocId(result.lastDoc);
         setHasMore(result.hasMore);
+        // Yeni yüklenen kategoriler için soru sayısı yükle
+        const counts = { ...categoryQuestionCounts };
+        await Promise.all(
+          result.categories.map(async (cat) => {
+            if (!(cat.kategoriAdi in counts)) {
+              const count = await getQuestionCountByCategoryName(
+                cat.kategoriAdi
+              );
+              counts[cat.kategoriAdi] = count;
+            }
+          })
+        );
+        setCategoryQuestionCounts(counts);
       } else {
         setHasMore(false);
       }
@@ -60,17 +86,26 @@ const Categories = () => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [lastDocId, hasMore, isLoadingMore]);
+  }, [lastDocId, hasMore, isLoadingMore, categoryQuestionCounts]);
 
   // İlk yükleme
   useEffect(() => {
     const fetchInitialCategories = async () => {
       try {
         setLoading(true);
-        const result = await getCategoriesPaginated(6);
+        const result = await getAllCategoriesPaginated(6);
         setCategories(result.categories);
         setLastDocId(result.lastDoc);
         setHasMore(result.hasMore);
+        // Soru sayıları da yükleniyor
+        const counts = {};
+        await Promise.all(
+          result.categories.map(async (cat) => {
+            const count = await getQuestionCountByCategoryName(cat.kategoriAdi);
+            counts[cat.kategoriAdi] = count;
+          })
+        );
+        setCategoryQuestionCounts(counts);
       } catch (error) {
         toast.error("Kategoriler yüklenirken bir hata oluştu!");
       } finally {
@@ -122,6 +157,7 @@ const Categories = () => {
     setSelectedCategory(cat);
     setEditedCategory(cat);
     setIsModalOpen(true);
+    setEditMode(false);
   };
 
   const handleCloseModal = () => {
@@ -261,6 +297,12 @@ const Categories = () => {
                       <FiTag className="text-blue-500" />
                       {cat.kategoriAdi}
                     </h3>
+                    <span className="text-xs text-blue-700 font-semibold bg-blue-100 rounded px-2 py-0.5 ml-2 whitespace-nowrap">
+                      {typeof categoryQuestionCounts[cat.kategoriAdi] ===
+                      "number"
+                        ? `${categoryQuestionCounts[cat.kategoriAdi]} soru`
+                        : "..."}
+                    </span>
                   </div>
                   <div className="space-y-2">
                     {cat.aciklama && (
@@ -338,11 +380,11 @@ const Categories = () => {
                   initial={{ scale: 0.97, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.97, opacity: 0 }}
-                  className="relative w-full max-w-lg mx-auto my-10 bg-white/95 rounded-2xl shadow-2xl p-0 overflow-hidden border border-gray-200 flex flex-col"
+                  className="relative w-full max-w-4xl mx-auto my-10 bg-white/95 rounded-2xl shadow-2xl p-0 overflow-hidden border border-gray-200 flex flex-col"
                   style={{ boxShadow: "0 12px 48px 0 rgba(31, 38, 135, 0.18)" }}
                 >
                   {/* Modal Header */}
-                  <div className="flex items-center gap-4 px-8 py-6 bg-gradient-to-r from-blue-700 via-blue-500 to-blue-400 text-white border-b border-blue-100">
+                  <div className="flex items-center gap-4 px-12 py-8 bg-gradient-to-r from-blue-700 via-blue-500 to-blue-400 text-white border-b border-blue-100">
                     <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-white/20 shadow-md">
                       <FiTag size={28} />
                     </div>
@@ -363,30 +405,46 @@ const Categories = () => {
                     </button>
                   </div>
                   {/* Modal Content */}
-                  <div className="px-8 py-8 grid grid-cols-1 gap-x-10 gap-y-7 bg-white/95">
-                    <FormField
-                      label="Kategori Adı"
-                      value={editedCategory?.kategoriAdi || ""}
-                      onChange={(e) =>
-                        handleInputChange("kategoriAdi", e.target.value)
-                      }
-                    />
-                    <FormField
-                      label="Açıklama (Opsiyonel)"
-                      type="textarea"
-                      value={editedCategory?.aciklama || ""}
-                      onChange={(e) =>
-                        handleInputChange("aciklama", e.target.value)
-                      }
-                    />
-                    <CustomDropdown
-                      label="Durum"
-                      options={statusOptions}
-                      value={editedCategory?.durum || "aktif"}
-                      onChange={(e) =>
-                        handleInputChange("durum", e.target.value)
-                      }
-                    />
+                  <div className="px-12 py-10 grid grid-cols-1 gap-x-10 gap-y-7 bg-white/95 justify-center">
+                    <div className="mx-auto">
+                      {isModalOpen && !isSaving && !editMode && (
+                        <>
+                          <KategoriDetayFormu initialValues={editedCategory} />
+                          <div className="flex justify-end mt-6">
+                            <button
+                              onClick={() => setEditMode(true)}
+                              className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors"
+                            >
+                              Düzenle
+                            </button>
+                          </div>
+                        </>
+                      )}
+                      {isModalOpen && editMode && (
+                        <KategoriFormu
+                          initialValues={editedCategory}
+                          isEdit={true}
+                          onSubmit={async (updatedData, reset) => {
+                            setIsSaving(true);
+                            await updateCategory(
+                              editedCategory.id,
+                              updatedData
+                            );
+                            setCategories(
+                              categories.map((cat) =>
+                                cat.id === editedCategory.id
+                                  ? { ...editedCategory, ...updatedData }
+                                  : cat
+                              )
+                            );
+                            toast.success("Kategori başarıyla güncellendi!");
+                            handleCloseModal();
+                            setIsSaving(false);
+                            setEditMode(false);
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
                   {/* Modal Footer */}
                   <div className="flex justify-end gap-4 px-8 pb-8 pt-6 border-t border-gray-100 bg-white/95">

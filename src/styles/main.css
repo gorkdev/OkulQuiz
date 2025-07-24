@@ -3,3 +3,45 @@
 body {
   overflow-x: hidden !important;
 }
+
+/* Number inputlarda sağdaki okları gizle */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* .dnd-animate animasyonunu kaldırdık */
+
+@keyframes circle-expand {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(100);
+    opacity: 1;
+  }
+}
+
+.circle-expand {
+  animation: circle-expand 1s cubic-bezier(0.4,0,0.2,1) forwards;
+}
+
+@keyframes circle-shrink {
+  0% {
+    transform: scale(100);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0);
+    opacity: 1;
+  }
+}
+
+.circle-shrink {
+  animation: circle-shrink 1s cubic-bezier(0.4,0,0.2,1) forwards;
+}

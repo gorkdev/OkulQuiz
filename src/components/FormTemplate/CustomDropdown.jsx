@@ -31,7 +31,7 @@ const CustomDropdown = ({
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay }}
-      className="group relative"
+      className="group relative select-none"
       ref={dropdownRef}
     >
       <label className="block text-sm font-medium text-gray-500 mb-2 transition-colors group-focus-within:text-gray-700">
@@ -84,7 +84,7 @@ const CustomDropdown = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="absolute z-10 w-full bg-white border border-t-0 border-[#DBE2EF] rounded-b-md shadow-lg"
+            className="absolute z-10 w-full bg-white border border-t-0 border-[#DBE2EF] rounded-b-md shadow-lg max-h-52 overflow-y-auto"
           >
             {options.map((option) => (
               <div
