@@ -26,24 +26,33 @@ import CustomDropdown from "@/components/FormTemplate/CustomDropdown";
 import { CiPause1 } from "react-icons/ci";
 import { GoCheck } from "react-icons/go";
 
+// Türkçe harf duyarsız karşılaştırma için yardımcı fonksiyon
+function normalizeString(str) {
+  return String(str)
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .replace(/İ/g, "i");
+}
+
 const Schools = () => {
-  const [schools, setSchools] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [schools, setSchools] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedSchool, setSelectedSchool] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editedSchool, setEditedSchool] = useState(null);
-  const [isSaving, setIsSaving] = useState(false);
   const [lastDocId, setLastDocId] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedSchool, setSelectedSchool] = useState(null);
+  const [editedSchool, setEditedSchool] = useState(null);
+
   const loadingRef = useRef(null);
   const observer = useRef(null);
 
   // Arama fonksiyonu
   const filteredSchools = schools.filter((school) =>
     Object.values(school).some((value) =>
-      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+      normalizeString(value).includes(normalizeString(searchTerm))
     )
   );
 

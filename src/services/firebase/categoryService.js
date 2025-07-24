@@ -50,30 +50,76 @@ export const isCategoryNameTaken = async (kategoriAdi) => {
  */
 export const getCategoriesPaginated = async (pageSize = 6, lastDocId = null) => {
   let categoriesQuery;
-  if (lastDocId) {
-    const lastDocRef = doc(db, "Kategoriler", lastDocId);
-    const lastDocSnap = await getDoc(lastDocRef);
-    categoriesQuery = query(
-      collection(db, "Kategoriler"),
-      orderBy("kategoriAdi"),
-      startAfter(lastDocSnap),
-      limit(pageSize)
-    );
-  } else {
-    categoriesQuery = query(
-      collection(db, "Kategoriler"),
-      orderBy("kategoriAdi"),
-      limit(pageSize)
-    );
+  try {
+    if (lastDocId) {
+      const lastDocRef = doc(db, "Kategoriler", lastDocId);
+      const lastDocSnap = await getDoc(lastDocRef);
+      categoriesQuery = query(
+        collection(db, "Kategoriler"),
+        where("durum", "==", "aktif"),
+        orderBy("kategoriAdi"),
+        startAfter(lastDocSnap),
+        limit(pageSize)
+      );
+    } else {
+      categoriesQuery = query(
+        collection(db, "Kategoriler"),
+        where("durum", "==", "aktif"),
+        orderBy("kategoriAdi"),
+        limit(pageSize)
+      );
+    }
+    const querySnapshot = await getDocs(categoriesQuery);
+    const categories = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    const hasMore = categories.length === pageSize;
+    const lastDoc = categories.length > 0 ? categories[categories.length - 1].id : null;
+    return { categories, hasMore, lastDoc };
+  } catch (error) {
+    console.error("Firestore kategori sorgu hatası:", error);
+    throw error;
   }
-  const querySnapshot = await getDocs(categoriesQuery);
-  const categories = querySnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
-  const hasMore = categories.length === pageSize;
-  const lastDoc = categories.length > 0 ? categories[categories.length - 1].id : null;
-  return { categories, hasMore, lastDoc };
+};
+
+/**
+ * Tüm kategorileri (aktif+pasif) sayfalı olarak getirir
+ * @param {number} pageSize
+ * @param {string|null} lastDocId
+ * @returns {Promise<{categories: Array, hasMore: boolean, lastDoc: string|null}>}
+ */
+export const getAllCategoriesPaginated = async (pageSize = 6, lastDocId = null) => {
+  let categoriesQuery;
+  try {
+    if (lastDocId) {
+      const lastDocRef = doc(db, "Kategoriler", lastDocId);
+      const lastDocSnap = await getDoc(lastDocRef);
+      categoriesQuery = query(
+        collection(db, "Kategoriler"),
+        orderBy("kategoriAdi"),
+        startAfter(lastDocSnap),
+        limit(pageSize)
+      );
+    } else {
+      categoriesQuery = query(
+        collection(db, "Kategoriler"),
+        orderBy("kategoriAdi"),
+        limit(pageSize)
+      );
+    }
+    const querySnapshot = await getDocs(categoriesQuery);
+    const categories = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    const hasMore = categories.length === pageSize;
+    const lastDoc = categories.length > 0 ? categories[categories.length - 1].id : null;
+    return { categories, hasMore, lastDoc };
+  } catch (error) {
+    console.error("Firestore tüm kategori sorgu hatası:", error);
+    throw error;
+  }
 };
 
 /**
