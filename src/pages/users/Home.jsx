@@ -35,7 +35,7 @@ const Home = () => {
           Hoş Geldin!
         </h1>
         <p className="text-lg text-gray-500 mb-6">
-          MiniCup ile eğlenerek öğren, başarılarını takip et.
+          MinikUP ile eğlenerek öğren, başarılarını takip et.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <a

@@ -298,7 +298,7 @@ const Login = () => {
                     🦒 Zürafa Yayınları
                   </p>
                   <p className="text-xs sm:text-sm md:text-base text-gray-700 mb-1">
-                    Merhaba! MiniCup'a hoş geldin!
+                    Merhaba! MinikUP'a hoş geldin!
                   </p>
                   <p className="text-xs sm:text-sm md:text-base text-gray-600">
                     Hazır mısın eğlenceye? ✨

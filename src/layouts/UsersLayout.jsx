@@ -14,7 +14,7 @@ const UsersLayout = () => {
         <div className="flex items-center gap-3">
           {/* Sade logo veya küçük maskot */}
           <span className="text-2xl font-bold text-blue-500 tracking-tight select-none">
-            MiniCup
+            MinikUP
           </span>
         </div>
         <nav className="flex items-center gap-6">
@@ -50,7 +50,7 @@ const UsersLayout = () => {
       </main>
       {/* Footer */}
       <footer className="bg-white border-t border-gray-100 text-center py-4 text-sm text-gray-400">
-        MiniCup © 2025
+        MinikUP © {new Date().getFullYear()}
       </footer>
     </div>
   );

@@ -17,6 +17,7 @@ import Questions from "../pages/admin/questions/Questions";
 import CreateNewQuiz from "../pages/admin/quiz/CreateNewQuiz";
 import QuizList from "../pages/users/quiz/QuizList";
 import QuizSolve from "../pages/users/quiz/QuizSolve";
+import Settings from "../pages/admin/settings/Settings";
 
 const router = createBrowserRouter([
   { path: "/", element: <Login /> },
@@ -47,6 +48,7 @@ const router = createBrowserRouter([
       { path: "questions", element: <Questions /> },
       { path: "questions/add", element: <AddNewQuestion /> },
       { path: "logs", element: <Logs /> },
+      { path: "settings", element: <Settings /> },
       { path: "*", element: <NotFound /> },
     ],
   },
