@@ -1,10 +1,14 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { getQuizById } from "../../../services/firebase/questionService";
 import { getQuestionsByIds } from "../../../services/firebase/questionService";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { IoIosWarning } from "react-icons/io";
+import { DndProvider, useDrag, useDrop, useDragLayer } from "react-dnd";
+import { HTML5Backend, getEmptyImage } from "react-dnd-html5-backend";
+import { BsGripVertical } from "react-icons/bs";
+import ConfettiPatlat from "../../../components/ConfettiPatlat";
 
 const QuizSolve = () => {
   const { quizId } = useParams();
@@ -22,6 +26,23 @@ const QuizSolve = () => {
   const [answersReview, setAnswersReview] = useState([]);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [optionOrder, setOptionOrder] = useState([]);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const update = () =>
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  // Klavye ile şık seçimi (erişilebilirlik)
+  const handleKeyDownOption = (event, optionIndex) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleOptionSelect(optionIndex);
+    }
+  };
 
   // Konfeti animasyonu
   useEffect(() => {
@@ -112,18 +133,23 @@ const QuizSolve = () => {
     return arr;
   }
 
-  // DnD sıralama fonksiyonu
-  function handleDragEnd(result) {
-    if (!result.destination) return;
-    const newOrder = Array.from(optionOrder);
-    const [removed] = newOrder.splice(result.source.index, 1);
-    newOrder.splice(result.destination.index, 0, removed);
-    setOptionOrder(newOrder);
-    // Sıralı şıklar için seçili sıralamayı da güncelle
-    if (currentQuestion.siraliSiklar) {
-      setSelectedOptions(newOrder);
-    }
-  }
+  // DnD: react-dnd ile sıralama
+  const moveOption = useCallback(
+    (fromIndex, toIndex) => {
+      if (fromIndex === toIndex) return;
+      setOptionOrder((prev) => {
+        const newOrder = [...prev];
+        const [removed] = newOrder.splice(fromIndex, 1);
+        newOrder.splice(toIndex, 0, removed);
+        const currentQuestion = questions[currentQuestionIndex];
+        if (currentQuestion?.siraliSiklar) {
+          setSelectedOptions(newOrder);
+        }
+        return newOrder;
+      });
+    },
+    [currentQuestionIndex, questions]
+  );
 
   const playQuestionAudio = () => {
     if (audioRef.current) {
@@ -263,64 +289,57 @@ const QuizSolve = () => {
     const percent = (score / maxScore) * 100;
     if (percent >= 90) {
       grade = "A";
-      color = "bg-green-200 text-green-900 border-green-400";
+      color = "bg-green-100 text-green-800 border-green-300";
       message =
-        "Harika! Sen bir süpersin! Tüm soruları neredeyse mükemmel yaptın. Böyle devam et!";
+        "Harika iş çıkardın! Performansın mükemmele çok yakın. Böyle devam et!";
     } else if (percent >= 75) {
       grade = "B";
-      color = "bg-blue-200 text-blue-900 border-blue-400";
+      color = "bg-blue-100 text-blue-800 border-blue-300";
       message =
-        "Çok iyisin! Birkaç küçük hata dışında çoğu soruyu doğru yaptın. Biraz daha çalışırsan süper olacaksın!";
+        "Çok iyi! Az bir farkla daha da yükselebilirsin. Biraz daha pratik harika olur.";
     } else if (percent >= 50) {
       grade = "C";
-      color = "bg-yellow-200 text-yellow-900 border-yellow-400";
+      color = "bg-yellow-100 text-yellow-800 border-yellow-300";
       message =
-        "Fena değil! Daha çok pratik yaparsan çok daha iyi olabilirsin. Vazgeçme!";
+        "Fena değil! Düzenli tekrarlarla çok daha iyi sonuçlar alabilirsin.";
     } else {
       grade = "D";
-      color = "bg-red-200 text-red-900 border-red-400";
+      color = "bg-red-100 text-red-800 border-red-300";
       message =
-        "Üzülme! Herkes hata yapabilir. Biraz daha çalışıp tekrar denersen çok daha iyi olacaksın!";
+        "Moral bozma. Her deneme daha iyiye götürür, tekrar deneyerek güçlenebilirsin.";
     }
     return (
-      <div className="min-h-screen  py-6 px-4 relative">
-        {confettiPieces > 0 && (
-          <Confetti
-            numberOfPieces={confettiPieces}
-            recycle={false}
-            gravity={0.2}
-            wind={0.01}
-            initialVelocityY={5}
-            style={{ position: "fixed" }}
-          />
-        )}
-
-        {/* Not ve mesaj kutusu en üstte, genişliği alt kutularla aynı, minimal */}
-        <div
-          className={`mx-auto maxw3x mb-4 rounded-lg border ${color} flex flex-col items-center justify-center px-4 py-3 text-center shadow-sm`}
-          style={{ maxWidth: 770, width: "100%" }}
-        >
-          <div className="text-2xl font-bold mb-1">Notun: {grade}</div>
-          <div className="text-base font-semibold mb-0.5">
-            Puanın: {score} / {maxScore}
-          </div>
-          <div className="text-sm font-medium mt-1">{message}</div>
-        </div>
-
-        <div className="mx-auto flex flex-col md:flex-row gap-4 items-stretch max-w-3xl w-full">
-          <motion.div
-            initial={{ scale: 0.97 }}
-            animate={{ scale: 1 }}
-            className="bg-white rounded-lg h-80 w-full md:w-96 shadow-sm p-4 flex flex-col justify-center"
+      <div className="min-h-screen py-8 px-4 relative">
+        <ConfettiPatlat />
+        <div className="max-w-4xl mx-auto">
+          <div
+            className={`w-full mb-6 rounded-xl border ${color} px-5 py-4 shadow-sm flex items-center justify-between`}
           >
-            <div className="text-center">
-              {/* Tebrikler icon'unun üstünde yeşil kutuda ufak mesaj */}
-              <div className="text-xs mb-2 font-semibold bg-green-100 text-green-800 rounded px-3 py-1 inline-block">
-                Önceki denemene göre %10 daha iyisin!
+            <div>
+              <div className="text-2xl font-extrabold tracking-tight">
+                Notun: {grade}
               </div>
-              <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
+              <div className="text-sm font-medium opacity-90 mt-0.5">
+                Puanın: {score} / {maxScore} ({percent.toFixed(0)}%)
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full bg-white/70 text-xs font-semibold border">
+                Tamamlandı
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="md:col-span-1 max-h-[300px] bg-white rounded-xl shadow-sm border border-gray-100 p-5"
+            >
+              <div className="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center mb-3">
                 <svg
-                  className="w-8 h-8 text-green-500"
+                  className="w-7 h-7"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -333,142 +352,151 @@ const QuizSolve = () => {
                   ></path>
                 </svg>
               </div>
-              <h2 className="text-lg font-bold text-gray-800 mb-1">
-                Tebrikler!
-              </h2>
-              <p className="text-gray-600 mb-3 text-sm">
-                Puan: <span className="font-bold text-blue-600">{score}</span>
-              </p>
+              <h2 className="text-lg font-bold text-gray-800">Tebrikler!</h2>
+              <p className="text-sm text-gray-600 mt-1">{message}</p>
+              <div className="mt-4 flex items-center gap-3">
+                <div className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold">
+                  Puan: {score}
+                </div>
+                <div className="px-3 py-1.5 bg-gray-50 text-gray-700 rounded-lg text-xs font-semibold">
+                  Sorular: {questions.length}
+                </div>
+              </div>
               <button
                 onClick={resetQuiz}
-                className="px-4 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                className="mt-5 w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               >
                 Tekrar Dene
               </button>
-            </div>
-          </motion.div>
+            </motion.div>
 
-          <div className="bg-white rounded-lg shadow-sm p-4 flex-1 flex flex-col">
-            <h3 className="text-base font-bold text-gray-800 mb-2">Sonuçlar</h3>
-            <div className="space-y-2">
-              {(() => {
-                const shown = new Set();
-                return answersReview
-                  .filter((ans) => {
-                    if (shown.has(ans.questionIndex)) return false;
-                    shown.add(ans.questionIndex);
-                    return true;
-                  })
-                  .map((answer, index) => {
-                    const question = questions[answer.questionIndex];
-                    return (
-                      <div
-                        key={index}
-                        className={`p-3 rounded border ${
-                          answer.isCorrect
-                            ? "border-green-200 bg-green-50"
-                            : "border-red-200 bg-red-50"
-                        }`}
-                      >
-                        <div className="flex items-start">
-                          <div
-                            className={`flex-shrink-0 w-4 h-4 rounded-full mt-1 mr-2 ${
-                              answer.isCorrect ? "bg-green-500" : "bg-red-500"
-                            }`}
-                          ></div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-800">
-                              {question.soruMetni || `Soru ${index + 1}`}
-                            </p>
+            <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <h3 className="text-base font-bold text-gray-800 mb-3">
+                Cevaplar
+              </h3>
+              <div className="space-y-3 overflow-auto pr-1">
+                {(() => {
+                  const shown = new Set();
+                  return answersReview
+                    .filter((ans) => {
+                      if (shown.has(ans.questionIndex)) return false;
+                      shown.add(ans.questionIndex);
+                      return true;
+                    })
+                    .map((answer, index) => {
+                      const question = questions[answer.questionIndex];
+                      return (
+                        <div
+                          key={index}
+                          className={`p-4 rounded-lg border ${
+                            answer.isCorrect
+                              ? "border-green-200/70 bg-green-50"
+                              : "border-red-200/70 bg-red-50"
+                          }`}
+                        >
+                          <div className="flex items-start">
                             <div
-                              className={`flex ${
-                                question.siklar?.some((sik) => sik.image)
-                                  ? "flex-row"
-                                  : "flex-col"
+                              className={`flex-shrink-0 w-5 h-5 rounded-full mt-0.5 mr-3 ${
+                                answer.isCorrect ? "bg-green-500" : "bg-red-500"
                               }`}
-                            >
-                              {(() => {
-                                const hasImageSelected = answer.selected.some(
-                                  (s) => question.siklar[s]?.image
-                                );
-                                if (hasImageSelected) {
-                                  return (
-                                    <div className="flex flex-row items-center gap-2 mt-1">
-                                      <span className="font-medium text-xs text-gray-600">
-                                        Senin cevabın:
-                                      </span>
-                                      {answer.selected.map((s, i) => {
-                                        const sik = question.siklar[s];
-                                        if (!sik) return null;
-                                        return (
-                                          <span
-                                            key={i}
-                                            className="inline-flex items-center mr-2"
-                                          >
-                                            {sik.image && (
-                                              <img
-                                                src={sik.image}
-                                                alt={sik.text || "Seçenek"}
-                                                className="w-6 h-6 rounded object-cover inline-block mr-1 "
-                                              />
-                                            )}
-                                            {sik.text}
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
+                            ></div>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-800">
+                                {question.soruMetni || `Soru ${index + 1}`}
+                              </p>
+                              <div
+                                className={`mt-1.5 flex ${
+                                  question.siklar?.some((sik) => sik.image)
+                                    ? "flex-row items-center flex-wrap gap-2"
+                                    : "flex-col gap-1"
+                                }`}
+                              >
+                                {(() => {
+                                  const hasImageSelected = answer.selected.some(
+                                    (s) => question.siklar[s]?.image
                                   );
-                                } else {
+                                  if (hasImageSelected) {
+                                    return (
+                                      <div className="flex flex-row items-center gap-2">
+                                        <span className="font-medium text-xs text-gray-600">
+                                          Senin cevabın:
+                                        </span>
+                                        {answer.selected.map((s, i) => {
+                                          const sik = question.siklar[s];
+                                          if (!sik) return null;
+                                          return (
+                                            <span
+                                              key={i}
+                                              className="inline-flex items-center mr-2 py-0.5 px-1.5 rounded bg-white/70 border"
+                                            >
+                                              {sik.image && (
+                                                <img
+                                                  src={sik.image}
+                                                  alt={sik.text || "Seçenek"}
+                                                  className="w-6 h-6 rounded object-cover inline-block mr-1"
+                                                />
+                                              )}
+                                              <span className="text-xs text-gray-700">
+                                                {sik.text}
+                                              </span>
+                                            </span>
+                                          );
+                                        })}
+                                      </div>
+                                    );
+                                  }
                                   return (
-                                    <p className="text-xs text-gray-600 mt-1">
+                                    <p className="text-xs text-gray-600">
                                       <span className="font-medium">
                                         Senin cevabın:
                                       </span>{" "}
                                       {answer.selected
-                                        .map((s, i) => question.siklar[s]?.text)
+                                        .map((s) => question.siklar[s]?.text)
                                         .join(", ")}
                                     </p>
                                   );
-                                }
-                              })()}
-                              {!answer.isCorrect &&
-                                (() => {
-                                  // Sıralı şıklar için doğru cevabı question.siklar sırasına göre göster
-                                  if (question.siraliSiklar) {
-                                    const hasImageCorrect =
-                                      question.siklar &&
-                                      question.siklar.some((sik) => sik?.image);
-                                    if (hasImageCorrect) {
-                                      return (
-                                        <div className="flex flex-row items-center gap-2 mt-1">
-                                          <span className="font-medium text-xs text-gray-600">
-                                            Doğru cevap:
-                                          </span>
-                                          {question.siklar &&
-                                            question.siklar.map((sik, i) => {
-                                              if (!sik) return null;
-                                              return (
-                                                <span
-                                                  key={i}
-                                                  className="inline-flex items-center mr-2"
-                                                >
-                                                  {sik.image && (
-                                                    <img
-                                                      src={sik.image}
-                                                      alt={
-                                                        sik.text || "Seçenek"
-                                                      }
-                                                      className="w-6 h-6 rounded object-cover inline-block mr-1 "
-                                                    />
-                                                  )}
-                                                  {sik.text}
-                                                </span>
-                                              );
-                                            })}
-                                        </div>
-                                      );
-                                    } else {
-                                      // Tüm doğru sıralı cevapları question.siklar sırasına göre virgülle ayırarak göster
+                                })()}
+
+                                {!answer.isCorrect &&
+                                  (() => {
+                                    if (question.siraliSiklar) {
+                                      const hasImageCorrect =
+                                        question.siklar &&
+                                        question.siklar.some(
+                                          (sik) => sik?.image
+                                        );
+                                      if (hasImageCorrect) {
+                                        return (
+                                          <div className="flex flex-row items-center gap-2 mt-1">
+                                            <span className="font-medium text-xs text-gray-600">
+                                              Doğru cevap:
+                                            </span>
+                                            {question.siklar &&
+                                              question.siklar.map((sik, i) => {
+                                                if (!sik) return null;
+                                                return (
+                                                  <span
+                                                    key={i}
+                                                    className="inline-flex items-center mr-2 py-0.5 px-1.5 rounded bg-white/70 border"
+                                                  >
+                                                    {sik.image && (
+                                                      <img
+                                                        src={sik.image}
+                                                        alt={
+                                                          sik.text || "Seçenek"
+                                                        }
+                                                        className="w-6 h-6 rounded object-cover inline-block mr-1"
+                                                      />
+                                                    )}
+                                                    <span className="text-xs text-gray-700">
+                                                      {sik.text}
+                                                    </span>
+                                                  </span>
+                                                );
+                                              })}
+                                          </div>
+                                        );
+                                      }
                                       return (
                                         <p className="text-xs text-gray-600">
                                           <span className="font-medium">
@@ -482,8 +510,6 @@ const QuizSolve = () => {
                                         </p>
                                       );
                                     }
-                                  } else {
-                                    // Diğer soru tipleri için mevcut davranış
                                     const hasImageCorrect = answer.correct.some(
                                       (c) => question.siklar[c]?.image
                                     );
@@ -499,45 +525,44 @@ const QuizSolve = () => {
                                             return (
                                               <span
                                                 key={i}
-                                                className="inline-flex items-center mr-2"
+                                                className="inline-flex items-center mr-2 py-0.5 px-1.5 rounded bg-white/70 border"
                                               >
                                                 {sik.image && (
                                                   <img
                                                     src={sik.image}
                                                     alt={sik.text || "Seçenek"}
-                                                    className="w-6 h-6 rounded object-cover inline-block mr-1 "
+                                                    className="w-6 h-6 rounded object-cover inline-block mr-1"
                                                   />
                                                 )}
-                                                {sik.text}
+                                                <span className="text-xs text-gray-700">
+                                                  {sik.text}
+                                                </span>
                                               </span>
                                             );
                                           })}
                                         </div>
                                       );
-                                    } else {
-                                      return (
-                                        <p className="text-xs text-gray-600">
-                                          <span className="font-medium">
-                                            Doğru cevap:
-                                          </span>{" "}
-                                          {answer.correct
-                                            .map(
-                                              (c) => question.siklar[c]?.text
-                                            )
-                                            .filter(Boolean)
-                                            .join(", ")}
-                                        </p>
-                                      );
                                     }
-                                  }
-                                })()}
+                                    return (
+                                      <p className="text-xs text-gray-600">
+                                        <span className="font-medium">
+                                          Doğru cevap:
+                                        </span>{" "}
+                                        {answer.correct
+                                          .map((c) => question.siklar[c]?.text)
+                                          .filter(Boolean)
+                                          .join(", ")}
+                                      </p>
+                                    );
+                                  })()}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  });
-              })()}
+                      );
+                    });
+                })()}
+              </div>
             </div>
           </div>
         </div>
@@ -551,116 +576,199 @@ const QuizSolve = () => {
   // İlgili sorunun bilgilerini console'a yazdır
   console.log("Current Question:", currentQuestion);
 
+  // react-dnd kartı
+  const DraggableOption = ({ option, index }) => {
+    const ref = useRef(null);
+    const [{ handlerId, isOver }, drop] = useDrop({
+      accept: "OPTION",
+      collect(monitor) {
+        return {
+          handlerId: monitor.getHandlerId(),
+          isOver: monitor.isOver({ shallow: true }),
+        };
+      },
+      hover(item) {
+        if (!ref.current) return;
+        const dragIndex = item.index;
+        const hoverIndex = index;
+        if (dragIndex === hoverIndex) return;
+        // Move immediately when hovered
+        moveOption(dragIndex, hoverIndex);
+        item.index = hoverIndex;
+      },
+    });
+    const [{ isDragging }, drag, preview] = useDrag({
+      type: "OPTION",
+      item: () => {
+        const rect = ref.current?.getBoundingClientRect();
+        return { index, width: rect ? Math.round(rect.width) : undefined };
+      },
+      collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+    });
+
+    useEffect(() => {
+      // Hide default HTML5 preview; we'll render custom preview
+      preview(getEmptyImage(), { captureDraggingState: true });
+    }, [preview]);
+
+    drag(drop(ref));
+    return (
+      <div
+        ref={ref}
+        data-handler-id={handlerId}
+        className={`flex items-center gap-4 border rounded-lg p-3 bg-white ${
+          isOver ? "border-2 border-dotted border-blue-300" : "border-gray-200"
+        } ${isDragging ? "opacity-0" : "opacity-100"}`}
+      >
+        <BsGripVertical className="text-gray-500 w-5 h-5" />
+        {option.image ? (
+          <div className="relative aspect-square w-12 h-12">
+            <img
+              src={option.image}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover rounded-md"
+            />
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between w-full">
+          <span className="text-sm font-medium text-gray-800 truncate">
+            {option.text}
+          </span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-100 text-gray-700 border border-yellow-400">
+            {index + 1}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  const CustomDragLayerComp = ({ currentQuestion, optionOrder }) => {
+    const { isDragging, item, currentOffset } = useDragLayer((monitor) => ({
+      isDragging: monitor.isDragging(),
+      item: monitor.getItem(),
+      currentOffset: monitor.getSourceClientOffset(),
+    }));
+
+    if (!isDragging || !item || item.index == null) return null;
+    const optionIdx = optionOrder[item.index];
+    const option = currentQuestion.siklar[optionIdx];
+
+    const layerStyles = {
+      pointerEvents: "none",
+      position: "fixed",
+      zIndex: 100,
+      left: 0,
+      top: 0,
+    };
+
+    const getItemStyles = () => {
+      if (!currentOffset) return { display: "none" };
+      const { x, y } = currentOffset;
+      const transform = `translate(${x}px, ${y}px) scale(1.06)`;
+      return {
+        transform,
+        WebkitTransform: transform,
+        width: item?.width ? `${item.width}px` : undefined,
+      };
+    };
+
+    return (
+      <div style={layerStyles}>
+        <div style={getItemStyles()}>
+          <div className="flex items-center gap-3 border border-blue-300 rounded-xl p-3 bg-white shadow-xl">
+            <BsGripVertical className="text-blue-500 w-5 h-5" />
+            {option?.image ? (
+              <div className="relative aspect-square w-12 h-12">
+                <img
+                  src={option.image}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover rounded-md"
+                />
+              </div>
+            ) : null}
+            <span className="text-sm font-semibold text-gray-900 truncate max-w-[220px]">
+              {option?.text}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Seçenekler render
   const renderOptions = () => {
     if (currentQuestion.siraliSiklar) {
-      // Sıralanabilir şıklar (DnD) - Quiz oluşturma ile birebir aynı
+      // react-dnd ile sıralama
       return (
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="options-droppable">
-            {(provided) => (
-              <div
-                className="flex flex-col gap-3"
-                ref={provided.innerRef}
-                {...provided.droppableProps}
-              >
-                {optionOrder.map((optionIdx, idx) => {
-                  const option = currentQuestion.siklar[optionIdx];
-                  return (
-                    <Draggable
-                      key={option.id || optionIdx}
-                      draggableId={String(option.id || optionIdx)}
-                      index={idx}
-                    >
-                      {(dragProvided, dragSnapshot) => (
-                        <div
-                          className={`flex items-center gap-4 border border-gray-200 rounded p-3 bg-white dnd-animate ${
-                            dragSnapshot.isDragging
-                              ? "shadow-lg scale-105 z-10"
-                              : ""
-                          }`}
-                          ref={dragProvided.innerRef}
-                          {...dragProvided.draggableProps}
-                        >
-                          <div
-                            {...dragProvided.dragHandleProps}
-                            className="cursor-grab pr-2 flex items-center"
-                          >
-                            <svg
-                              width="18"
-                              height="18"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle cx="5" cy="7" r="1.5" fill="#888" />
-                              <circle cx="5" cy="12" r="1.5" fill="#888" />
-                              <circle cx="5" cy="17" r="1.5" fill="#888" />
-                              <circle cx="12" cy="7" r="1.5" fill="#888" />
-                              <circle cx="12" cy="12" r="1.5" fill="#888" />
-                              <circle cx="12" cy="17" r="1.5" fill="#888" />
-                            </svg>
-                          </div>
-                          <div className="flex-1 flex flex-col gap-2">
-                            {option.image ? (
-                              <div className="relative aspect-square w-16 h-16 mb-1">
-                                <img
-                                  src={option.image}
-                                  alt=""
-                                  className="absolute inset-0 w-full h-full object-cover rounded"
-                                />
-                              </div>
-                            ) : null}
-                            <span className="text-sm font-medium text-gray-800">
-                              {option.text}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </Draggable>
-                  );
-                })}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+        <DndProvider backend={HTML5Backend}>
+          <div className="flex flex-col gap-3">
+            {optionOrder.map((optionIdx, idx) => {
+              const option = currentQuestion.siklar[optionIdx];
+              return (
+                <DraggableOption
+                  key={option.id || optionIdx}
+                  option={option}
+                  index={idx}
+                />
+              );
+            })}
+          </div>
+          <CustomDragLayerComp
+            currentQuestion={currentQuestion}
+            optionOrder={optionOrder}
+          />
+        </DndProvider>
       );
     } else {
       // Normal veya karışık şıklar
       return (
         <div
-          className={`space-y-2 ${
-            hasOptionImages ? "grid grid-cols-2 gap-2" : ""
-          }`}
+          className={
+            hasOptionImages
+              ? "grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3"
+              : "space-y-2"
+          }
         >
           {optionOrder.map((optionIdx, index) => {
             const option = currentQuestion.siklar[optionIdx];
             if (!option) return null;
             return (
               <motion.div
+                layout
                 whileTap={{ scale: 0.98 }}
                 key={option.id || optionIdx}
                 onClick={() => handleOptionSelect(optionIdx)}
-                className={`rounded-md overflow-hidden ${
+                role="button"
+                tabIndex={0}
+                aria-pressed={selectedOptions.includes(optionIdx)}
+                onKeyDown={(e) => handleKeyDownOption(e, optionIdx)}
+                className={`rounded-xl overflow-hidden cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   selectedOptions.includes(optionIdx)
-                    ? "ring-2 ring-blue-500"
-                    : "border border-gray-200"
+                    ? "ring-2 ring-blue-500 border border-blue-200"
+                    : "border border-gray-200 hover:border-gray-300"
                 }`}
               >
                 {option.image ? (
-                  <div className="relative aspect-square">
+                  <div className="relative aspect-square cursor-pointer bg-gray-50">
                     <img
                       src={option.image}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="absolute inset-0 w-full h-full object-cover"
                     />
+                    {selectedOptions.includes(optionIdx) && (
+                      <div className="absolute inset-0 ring-2 ring-blue-500 rounded-xl pointer-events-none"></div>
+                    )}
                   </div>
                 ) : (
                   <div
-                    className={`p-3 ${
+                    className={`p-4 transition-colors ${
                       selectedOptions.includes(optionIdx)
                         ? "bg-blue-50"
-                        : "hover:bg-gray-50"
+                        : "bg-white hover:bg-gray-50"
                     }`}
                   >
                     <div className="flex items-center">
@@ -671,7 +779,9 @@ const QuizSolve = () => {
                             : "border-gray-400"
                         }`}
                       ></div>
-                      <span className="text-sm">{option.text}</span>
+                      <span className="text-sm font-medium text-gray-800">
+                        {option.text}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -684,28 +794,34 @@ const QuizSolve = () => {
   };
 
   return (
-    <div className="min-h-screen py-6 px-4">
-      <div className="max-w-md mx-auto">
-        {/* Quiz Başlık */}
-        <div className="mb-5">
-          <div className="flex justify-between items-center text-sm mb-2">
-            <span className="text-blue-600">
+    <div className="">
+      <div className="max-w-2xl bg-white rounded-2xl mx-auto px-4 py-6">
+        {/* Üst Bilgi ve İlerleme */}
+        <div className="sticky top-0 z-10 -mx-4 mb-4 px-4 pt-3 pb-3 bg-gradient-to-b from-white/90 to-white/60 backdrop-blur">
+          <div className="flex items-center justify-between">
+            <div className="text-[13px] font-semibold text-blue-700">
               Soru {currentQuestionIndex + 1}/{questions.length}
-            </span>
-            <div className="flex items-center space-x-3">
+            </div>
+            <div className="flex items-center gap-2 text-xs">
               {currentQuestion.puanVar && (
-                <span className="text-green-600">
+                <span className="px-2 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">
                   {currentQuestion.puan} Puan
                 </span>
               )}
               {currentQuestion.sureVar && (
-                <span className="text-red-600">{timeLeft}s</span>
+                <span
+                  className="px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200"
+                  aria-live="polite"
+                >
+                  {timeLeft}s
+                </span>
               )}
+              {/* Ses butonu başlıktan kaldırıldı */}
             </div>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-1.5">
+          <div className="mt-2 w-full h-2 sm:h-2 rounded-full bg-gray-200 overflow-hidden">
             <div
-              className="bg-blue-600 h-1.5 rounded-full"
+              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500 ease-out"
               style={{
                 width: `${(currentQuestionIndex / questions.length) * 100}%`,
               }}
@@ -714,15 +830,15 @@ const QuizSolve = () => {
         </div>
 
         {/* Soru Kartı */}
-        <div className="bg-white rounded-lg shadow-sm p-5 mb-5">
+        <div className="bg-white">
           {/* Soru Görselleri */}
           {currentQuestion.gorselVar &&
             currentQuestion.gorseller?.length > 0 && (
-              <div className="mb-4 grid grid-cols-2 gap-2">
+              <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                 {currentQuestion.gorseller.map((image, index) => (
                   <div
                     key={index}
-                    className="relative aspect-square bg-gray-100 rounded overflow-hidden"
+                    className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden"
                   >
                     <img
                       src={image}
@@ -744,14 +860,17 @@ const QuizSolve = () => {
           {currentQuestion.soruSesiVar && currentQuestion.soruSesi && (
             <button
               onClick={playQuestionAudio}
-              className={`flex items-center px-3 py-1.5 mb-4 text-xs rounded ${
+              aria-label={
+                audioPlaying ? "Soru sesi oynatılıyor" : "Soru sesini dinle"
+              }
+              className={`mb-3 cursor-pointer inline-flex items-center gap-2 px-5 py-2 rounded-full border text-xs ${
                 audioPlaying
-                  ? "bg-blue-100 text-blue-800"
-                  : "bg-gray-100 text-gray-800"
+                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                  : "bg-gray-50 text-gray-700 border-gray-200"
               }`}
             >
               <svg
-                className="w-3 h-3 mr-2"
+                className="w-4 h-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -763,20 +882,21 @@ const QuizSolve = () => {
                   d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414 1.414m2.828-9.9a9 9 0 012.728-2.728"
                 ></path>
               </svg>
-              {audioPlaying ? "Oynatılıyor..." : "Sesi Dinle"}
+              {audioPlaying ? "Oynatılıyor" : "Sesi Dinle"}
             </button>
           )}
 
           {/* Soru Metni */}
-          <h2 className="text-md font-medium text-gray-800 mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 leading-relaxed mb-3">
             {currentQuestion.soruMetni}
           </h2>
 
           {/* İpucu */}
           {currentQuestion.ipucuVar && currentQuestion.ipucu && (
-            <div className="my-4 flex gap-1 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
-              <p className="font-medium text-yellow-800">İpucu:</p>
-              <p className="text-yellow-700">{currentQuestion.ipucu}</p>
+            <div className="mb-4 flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+              <IoIosWarning className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+              <span className="font-semibold text-yellow-800">İpucu:</span>
+              <span className="text-yellow-700">{currentQuestion.ipucu}</span>
             </div>
           )}
 
@@ -784,18 +904,26 @@ const QuizSolve = () => {
           {renderOptions()}
         </div>
 
-        {/* İlerleme Butonu */}
-        <button
-          onClick={handleNextQuestion}
-          disabled={selectedOptions.length === 0 && currentQuestion.soruZorunlu}
-          className={`w-full py-2.5 rounded-lg text-sm font-medium ${
-            selectedOptions.length === 0 && currentQuestion.soruZorunlu
-              ? "bg-gray-200 text-gray-500"
-              : "bg-blue-600 text-white hover:bg-blue-700"
-          }`}
-        >
-          {currentQuestionIndex === questions.length - 1 ? "Bitir" : "Sonraki"}
-        </button>
+        {/* Alt Navigasyon */}
+        <div className="sticky bottom-0 -mx-4 mt-5 px-4 pb-4 pt-3 bg-gradient-to-t from-white/90 to-white/40 backdrop-blur">
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={handleNextQuestion}
+              disabled={
+                selectedOptions.length === 0 && currentQuestion.soruZorunlu
+              }
+              className={`min-w-[120px] inline-flex cursor-pointer items-center justify-center px-4 py-2.5 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                selectedOptions.length === 0 && currentQuestion.soruZorunlu
+                  ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                  : "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500"
+              }`}
+            >
+              {currentQuestionIndex === questions.length - 1
+                ? "Bitir"
+                : "Sonraki"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

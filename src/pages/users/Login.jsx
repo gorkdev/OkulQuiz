@@ -401,7 +401,7 @@ const Login = () => {
                 <motion.button
                   type="button"
                   onClick={handleLogin}
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-3 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg"
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 cursor-pointer text-white font-semibold py-3 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg"
                   whileTap={{ scale: 0.98 }}
                   whileHover={{ scale: 1.01 }}
                   initial={{ y: 20, opacity: 0 }}
@@ -417,7 +417,7 @@ const Login = () => {
                 <motion.button
                   type="button"
                   onClick={handleGuestLogin}
-                  className="w-full bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white font-semibold py-3 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg"
+                  className="w-full bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 cursor-pointer text-white font-semibold py-3 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg"
                   whileTap={{ scale: 0.98 }}
                   whileHover={{ scale: 1.01 }}
                   initial={{ y: 20, opacity: 0 }}

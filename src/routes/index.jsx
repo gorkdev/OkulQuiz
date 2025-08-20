@@ -15,6 +15,7 @@ import AddNewCategory from "../pages/admin/categories/AddNewCategory";
 import Categories from "../pages/admin/categories/Categories";
 import Questions from "../pages/admin/questions/Questions";
 import CreateNewQuiz from "../pages/admin/quiz/CreateNewQuiz";
+import Profile from "../pages/users/Profile";
 import QuizList from "../pages/users/quiz/QuizList";
 import QuizSolve from "../pages/users/quiz/QuizSolve";
 import Settings from "../pages/admin/settings/Settings";
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
       { index: true, element: <Home /> },
       { path: "quiz", element: <QuizList /> },
       { path: "quiz/:quizId", element: <QuizSolve /> },
+      { path: "profile", element: <Profile /> },
       { path: "*", element: <NotFound /> },
     ],
   },
