@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import AdminHeader from "@/components/AdminHeader/AdminHeader";
-import { getQuestionsPaginated } from "@/services/firebase/questionService";
+import { getQuestionsPaginated } from "@/services/mysql/questionService";
 import { toast } from "react-toastify";
 import { motion, AnimatePresence } from "framer-motion";
 import FormField from "@/components/FormTemplate/FormField";
@@ -30,63 +30,20 @@ const Questions = () => {
   const observer = useRef(null);
 
   // Türkçe harf duyarsız karşılaştırma için yardımcı fonksiyon
-  function normalizeString(str) {
+  const normalizeString = (str) => {
     return String(str)
       .toLocaleLowerCase("tr-TR")
       .replace(/ı/g, "i")
       .replace(/İ/g, "i");
-  }
-
-  // Arama fonksiyonu (Categories ile aynı mantık, array ve görünen değer desteğiyle)
-  function flattenValues(obj) {
-    let vals = [];
-    if (Array.isArray(obj)) {
-      for (const item of obj) {
-        if (typeof item === "object" && item !== null) {
-          vals = vals.concat(flattenValues(item));
-        } else {
-          vals.push(item);
-        }
-      }
-    } else if (typeof obj === "object" && obj !== null) {
-      for (const value of Object.values(obj)) {
-        if (typeof value === "object" && value !== null) {
-          vals = vals.concat(flattenValues(value));
-        } else {
-          vals.push(value);
-        }
-      }
-      // Ekstra: Görünen değerleri de ekle
-      if (obj.zorluk && difficultyLabels[obj.zorluk]) {
-        vals.push(difficultyLabels[obj.zorluk]); // Kolay/Orta/Zor
-      }
-      if (obj.puan) {
-        vals.push(`${obj.puan} puan`);
-      }
-      if (obj.sure) {
-        vals.push(`${obj.sure} sn`);
-      }
-      if (obj.kategori && obj.kategori.kategoriAdi) {
-        vals.push(obj.kategori.kategoriAdi);
-      }
-    } else {
-      vals.push(obj);
-    }
-    return vals;
-  }
-
-  const filteredQuestions = questions.filter((q) =>
-    flattenValues(q).some((value) =>
-      normalizeString(value).includes(normalizeString(searchTerm))
-    )
-  );
+  };
 
   // Veri yükleme fonksiyonu
   const loadMoreQuestions = useCallback(async () => {
-    if (isLoadingMore || !hasMore) return;
+    if (isLoadingMore || !hasMore || searchTerm.trim()) return;
     try {
       setIsLoadingMore(true);
-      const result = await getQuestionsPaginated(6, lastDocId);
+      const nextPage = lastDocId ? lastDocId + 1 : 2;
+      const result = await getQuestionsPaginated(nextPage, 6);
       if (result.questions.length > 0) {
         setQuestions((prev) => [...prev, ...result.questions]);
         setLastDocId(result.lastDoc);
@@ -99,25 +56,44 @@ const Questions = () => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [lastDocId, hasMore, isLoadingMore]);
+  }, [lastDocId, hasMore, isLoadingMore, searchTerm]);
 
-  // İlk yükleme
+  // İlk yükleme ve arama işlemleri
   useEffect(() => {
-    const fetchInitialQuestions = async () => {
+    const fetchQuestions = async () => {
       try {
         setLoading(true);
-        const result = await getQuestionsPaginated(6);
-        setQuestions(result.questions);
-        setLastDocId(result.lastDoc);
-        setHasMore(result.hasMore);
+
+        if (!searchTerm.trim()) {
+          // Arama yoksa normal pagination ile yükle
+          const result = await getQuestionsPaginated(1, 6);
+          setQuestions(result.questions);
+          setLastDocId(result.lastDoc);
+          setHasMore(result.hasMore);
+        } else {
+          // Arama varsa backend'den arama sonuçlarını getir
+          const result = await getQuestionsPaginated(1, 50, searchTerm);
+          setQuestions(result.questions);
+          setLastDocId(result.lastDoc);
+          setHasMore(false); // Arama sonuçlarında pagination yok
+        }
       } catch (error) {
         toast.error("Sorular yüklenirken bir hata oluştu!");
       } finally {
         setLoading(false);
       }
     };
-    fetchInitialQuestions();
-  }, []);
+
+    // Debounce ile arama
+    const timeoutId = setTimeout(
+      () => {
+        fetchQuestions();
+      },
+      searchTerm ? 500 : 0
+    );
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   // Intersection Observer kurulumu
   useEffect(() => {
@@ -128,7 +104,12 @@ const Questions = () => {
       threshold: 0.1,
     };
     observer.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+      if (
+        entries[0].isIntersecting &&
+        hasMore &&
+        !isLoadingMore &&
+        !searchTerm.trim()
+      ) {
         loadMoreQuestions();
       }
     }, options);
@@ -140,11 +121,13 @@ const Questions = () => {
         observer.current.disconnect();
       }
     };
-  }, [loading, hasMore, isLoadingMore, loadMoreQuestions]);
+  }, [loading, hasMore, isLoadingMore, loadMoreQuestions, searchTerm]);
 
   // Arama yapıldığında scroll'u sıfırla
   useEffect(() => {
-    window.scrollTo(0, 0);
+    if (searchTerm) {
+      window.scrollTo(0, 0);
+    }
   }, [searchTerm]);
 
   if (loading) {
@@ -176,7 +159,7 @@ const Questions = () => {
               </div>
               <div className="flex items-center justify-end">
                 <span className="text-sm bg-blue-50 text-blue-600 py-2 px-4 rounded-lg font-medium">
-                  Toplam {filteredQuestions.length} soru listeleniyor
+                  Toplam {questions.length} soru
                 </span>
               </div>
             </div>
@@ -186,7 +169,7 @@ const Questions = () => {
         {/* Soru Kartları */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <AnimatePresence>
-            {filteredQuestions.map((q) => (
+            {questions.map((q) => (
               <motion.div
                 key={q.id}
                 initial={{ opacity: 0 }}
@@ -199,14 +182,14 @@ const Questions = () => {
                   <div className="flex justify-between items-start mb-3">
                     <h3 className="text-base font-semibold text-gray-800 leading-tight line-clamp-2 flex items-center gap-2">
                       <LiaQuestionSolid className="text-blue-500" />
-                      {q.kategori?.kategoriAdi || "-"}
+                      {q.kategori?.kategori_adi || "-"}
                     </h3>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center text-gray-600 text-xs">
                       <span className="truncate">
-                        {q.soruMetniVar && q.soruMetni
-                          ? q.soruMetni
+                        {q.soru_metni_var && q.soru_metni
+                          ? q.soru_metni
                           : "Soru metni yok.."}
                       </span>
                     </div>
@@ -250,11 +233,11 @@ const Questions = () => {
 
         {/* Yükleniyor ve Sonuç Bulunamadı */}
         <div className="mt-6">
-          {hasMore && !searchTerm ? (
+          {hasMore && !searchTerm.trim() ? (
             <div ref={loadingRef} className="py-4">
               <Loader className="h-24" />
             </div>
-          ) : filteredQuestions.length === 0 ? (
+          ) : questions.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -263,7 +246,9 @@ const Questions = () => {
               className="text-center py-16"
             >
               <div className="text-gray-400 text-lg">
-                Arama kriterine uygun soru bulunamadı
+                {searchTerm
+                  ? "Arama kriterine uygun soru bulunamadı"
+                  : "Henüz soru eklenmemiş"}
               </div>
             </motion.div>
           ) : null}

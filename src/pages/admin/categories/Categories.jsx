@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import AdminHeader from "@/components/AdminHeader/AdminHeader";
 import {
-  getAllCategoriesPaginated,
+  getCategoriesPaginated,
   updateCategory,
   deleteCategory,
   setCategoryActive,
   setCategoryPassive,
-} from "@/services/firebase/categoryService";
+} from "@/services/mysql/categoryService";
 import { toast } from "react-toastify";
 import { FiChevronRight, FiX, FiTrash2, FiSave, FiTag } from "react-icons/fi";
 import { GoCheck } from "react-icons/go";
@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import FormField from "@/components/FormTemplate/FormField";
 import CustomDropdown from "@/components/FormTemplate/CustomDropdown";
 import Loader from "@/components/Loader";
-import { getQuestionCountByCategoryName } from "@/services/firebase/questionService";
+import { getQuestionCountByCategoryName } from "@/services/mysql/categoryService";
 import KategoriFormu from "./KategoriFormu";
 import KategoriDetayFormu from "./KategoriDetayFormu";
 
@@ -23,14 +23,6 @@ const statusOptions = [
   { value: "aktif", label: "Aktif" },
   { value: "pasif", label: "Pasif" },
 ];
-
-// Türkçe harf duyarsız karşılaştırma için yardımcı fonksiyon
-function normalizeString(str) {
-  return String(str)
-    .toLocaleLowerCase("tr-TR")
-    .replace(/ı/g, "i")
-    .replace(/İ/g, "i");
-}
 
 const Categories = () => {
   const [categories, setCategories] = useState([]);
@@ -48,19 +40,21 @@ const Categories = () => {
   const [categoryQuestionCounts, setCategoryQuestionCounts] = useState({});
   const [editMode, setEditMode] = useState(false);
 
-  // Arama fonksiyonu
-  const filteredCategories = categories.filter((cat) =>
-    Object.values(cat).some((value) =>
-      normalizeString(value).includes(normalizeString(searchTerm))
-    )
-  );
+  // MySQL backend'den gelen veriler için normalizeString fonksiyonu
+  const normalizeString = (str) => {
+    return String(str)
+      .toLocaleLowerCase("tr-TR")
+      .replace(/ı/g, "i")
+      .replace(/İ/g, "i");
+  };
 
   // Veri yükleme fonksiyonu
   const loadMoreCategories = useCallback(async () => {
     if (isLoadingMore || !hasMore) return;
     try {
       setIsLoadingMore(true);
-      const result = await getAllCategoriesPaginated(6, lastDocId);
+      const nextPage = lastDocId ? lastDocId + 1 : 2;
+      const result = await getCategoriesPaginated(nextPage, 6);
       if (result.categories.length > 0) {
         setCategories((prev) => [...prev, ...result.categories]);
         setLastDocId(result.lastDoc);
@@ -69,11 +63,11 @@ const Categories = () => {
         const counts = { ...categoryQuestionCounts };
         await Promise.all(
           result.categories.map(async (cat) => {
-            if (!(cat.kategoriAdi in counts)) {
+            if (!(cat.kategori_adi in counts)) {
               const count = await getQuestionCountByCategoryName(
-                cat.kategoriAdi
+                cat.kategori_adi
               );
-              counts[cat.kategoriAdi] = count;
+              counts[cat.kategori_adi] = count;
             }
           })
         );
@@ -88,32 +82,64 @@ const Categories = () => {
     }
   }, [lastDocId, hasMore, isLoadingMore, categoryQuestionCounts]);
 
-  // İlk yükleme
+  // İlk yükleme ve arama işlemleri
   useEffect(() => {
-    const fetchInitialCategories = async () => {
+    const fetchCategories = async () => {
       try {
         setLoading(true);
-        const result = await getAllCategoriesPaginated(6);
-        setCategories(result.categories);
-        setLastDocId(result.lastDoc);
-        setHasMore(result.hasMore);
-        // Soru sayıları da yükleniyor
-        const counts = {};
-        await Promise.all(
-          result.categories.map(async (cat) => {
-            const count = await getQuestionCountByCategoryName(cat.kategoriAdi);
-            counts[cat.kategoriAdi] = count;
-          })
-        );
-        setCategoryQuestionCounts(counts);
+
+        if (!searchTerm.trim()) {
+          // Arama yoksa normal pagination ile yükle
+          const result = await getCategoriesPaginated(1, 6);
+          setCategories(result.categories);
+          setLastDocId(result.lastDoc);
+          setHasMore(result.hasMore);
+          // Soru sayıları da yükleniyor
+          const counts = {};
+          await Promise.all(
+            result.categories.map(async (cat) => {
+              const count = await getQuestionCountByCategoryName(
+                cat.kategori_adi
+              );
+              counts[cat.kategori_adi] = count;
+            })
+          );
+          setCategoryQuestionCounts(counts);
+        } else {
+          // Arama varsa backend'den arama sonuçlarını getir
+          const result = await getCategoriesPaginated(1, 50, searchTerm);
+          setCategories(result.categories);
+          setLastDocId(result.lastDoc);
+          setHasMore(false); // Arama sonuçlarında pagination yok
+          // Soru sayıları da yükleniyor
+          const counts = {};
+          await Promise.all(
+            result.categories.map(async (cat) => {
+              const count = await getQuestionCountByCategoryName(
+                cat.kategori_adi
+              );
+              counts[cat.kategori_adi] = count;
+            })
+          );
+          setCategoryQuestionCounts(counts);
+        }
       } catch (error) {
         toast.error("Kategoriler yüklenirken bir hata oluştu!");
       } finally {
         setLoading(false);
       }
     };
-    fetchInitialCategories();
-  }, []);
+
+    // Debounce ile arama
+    const timeoutId = setTimeout(
+      () => {
+        fetchCategories();
+      },
+      searchTerm ? 500 : 0
+    );
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   // Intersection Observer kurulumu
   useEffect(() => {
@@ -124,7 +150,12 @@ const Categories = () => {
       threshold: 0.1,
     };
     observer.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+      if (
+        entries[0].isIntersecting &&
+        hasMore &&
+        !isLoadingMore &&
+        !searchTerm.trim()
+      ) {
         loadMoreCategories();
       }
     }, options);
@@ -136,11 +167,13 @@ const Categories = () => {
         observer.current.disconnect();
       }
     };
-  }, [loading, hasMore, isLoadingMore, loadMoreCategories]);
+  }, [loading, hasMore, isLoadingMore, loadMoreCategories, searchTerm]);
 
   // Arama yapıldığında scroll'u sıfırla
   useEffect(() => {
-    window.scrollTo(0, 0);
+    if (searchTerm) {
+      window.scrollTo(0, 0);
+    }
   }, [searchTerm]);
 
   useEffect(() => {
@@ -272,7 +305,7 @@ const Categories = () => {
               </div>
               <div className="flex items-center justify-end">
                 <span className="text-sm bg-blue-50 text-blue-600 py-2 px-4 rounded-lg font-medium">
-                  Toplam {filteredCategories.length} kategori listeleniyor
+                  Toplam {categories.length} kategori
                 </span>
               </div>
             </div>
@@ -282,7 +315,7 @@ const Categories = () => {
         {/* Kategori Kartları */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <AnimatePresence>
-            {filteredCategories.map((cat) => (
+            {categories.map((cat) => (
               <motion.div
                 key={cat.id}
                 initial={{ opacity: 0 }}
@@ -295,12 +328,12 @@ const Categories = () => {
                   <div className="flex justify-between items-start mb-3">
                     <h3 className="text-base font-semibold text-gray-800 leading-tight line-clamp-2 flex items-center gap-2">
                       <FiTag className="text-blue-500" />
-                      {cat.kategoriAdi}
+                      {cat.kategori_adi}
                     </h3>
                     <span className="text-xs text-blue-700 font-semibold bg-blue-100 rounded px-2 py-0.5 ml-2 whitespace-nowrap">
-                      {typeof categoryQuestionCounts[cat.kategoriAdi] ===
+                      {typeof categoryQuestionCounts[cat.kategori_adi] ===
                       "number"
-                        ? `${categoryQuestionCounts[cat.kategoriAdi]} soru`
+                        ? `${categoryQuestionCounts[cat.kategori_adi]} soru`
                         : "..."}
                     </span>
                   </div>
@@ -342,11 +375,11 @@ const Categories = () => {
 
         {/* Yükleniyor ve Sonuç Bulunamadı */}
         <div className="mt-6">
-          {hasMore && !searchTerm ? (
+          {hasMore && !searchTerm.trim() ? (
             <div ref={loadingRef} className="py-4">
               <Loader className="h-24" />
             </div>
-          ) : filteredCategories.length === 0 ? (
+          ) : categories.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -355,7 +388,9 @@ const Categories = () => {
               className="text-center py-16"
             >
               <div className="text-gray-400 text-lg">
-                Arama kriterine uygun kategori bulunamadı
+                {searchTerm
+                  ? "Arama kriterine uygun kategori bulunamadı"
+                  : "Henüz kategori eklenmemiş"}
               </div>
             </motion.div>
           ) : null}

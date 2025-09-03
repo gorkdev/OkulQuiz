@@ -1,111 +1,167 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import AdminHeader from "../../../components/AdminHeader/AdminHeader";
 import FormField from "../../../components/FormTemplate/FormField";
 import {
-  getSchools,
-  updateSchool,
   getSchoolsPaginated,
-} from "../../../services/firebase/schoolService";
+  updateSchool,
+} from "../../../services/mysql/schoolService";
+import { addCreditToSchool } from "../../../services/mysql/creditService";
 import Loader from "../../../components/Loader";
-import { motion } from "framer-motion";
-import { addLog } from "../../../services/firebase/logService";
+import { motion, AnimatePresence } from "framer-motion";
+import { addLog } from "../../../services/mysql/logService";
+import {
+  FiUsers,
+  FiMapPin,
+  FiPhone,
+  FiMail,
+  FiCalendar,
+  FiPlus,
+  FiMinus,
+  FiSave,
+  FiX,
+  FiHome,
+  FiDollarSign,
+} from "react-icons/fi";
+import { sayiFormatla } from "../../../hooks/sayiFormatla";
+import { toast } from "react-toastify";
 
 const AddCredi = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [schools, setSchools] = useState([]);
-  const [selectedSchoolId, setSelectedSchoolId] = useState(null);
-  const [creditValue, setCreditValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalSchool, setModalSchool] = useState(null);
-  const [modalInitialCredit, setModalInitialCredit] = useState("");
   const [modalCredit, setModalCredit] = useState("");
   const [newCredit, setNewCredit] = useState(null);
-  const modalRef = React.useRef(null);
-  const [lastDocId, setLastDocId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const loadingRef = React.useRef(null);
-  const observer = React.useRef(null);
+  const [totalCount, setTotalCount] = useState(0);
 
-  const filteredSchools = schools.filter((school) => {
-    const name = school.name || school.okulAdi || "";
-    return name.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  const modalRef = useRef(null);
+  const loadingRef = useRef(null);
+  const observer = useRef(null);
 
-  const loadMoreSchools = React.useCallback(async () => {
-    if (isLoadingMore || !hasMore) return;
+  // Arama input değişikliği için callback
+  const handleSearchChange = useCallback((e) => {
+    setSearchTerm(e.target.value);
+  }, []);
+
+  // Arama fonksiyonu
+  const fetchSchools = useCallback(async (search = searchTerm) => {
+    try {
+      setLoading(true);
+
+      if (!search.trim()) {
+        // Arama yoksa normal pagination ile yükle
+        const result = await getSchoolsPaginated(1, 6);
+        setSchools(result.schools);
+        setCurrentPage(1);
+        setHasMore(result.hasMore);
+        setTotalCount(result.totalCount);
+      } else {
+        // Arama varsa backend'den arama sonuçlarını getir
+        const result = await getSchoolsPaginated(1, 50, search);
+        setSchools(result.schools);
+        setCurrentPage(1);
+        setHasMore(false); // Arama sonuçlarında pagination yok
+        setTotalCount(result.totalCount);
+      }
+    } catch (error) {
+      console.error("Okullar yüklenirken hata oluştu:", error);
+      const errorMessage =
+        error.message || "Okullar yüklenirken bir hata oluştu!";
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Enter'a basıldığında arama yap
+  const handleSearchSubmit = useCallback(
+    (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        fetchSchools(searchTerm);
+      }
+    },
+    [searchTerm, fetchSchools]
+  );
+
+  // İlk yükleme
+  useEffect(() => {
+    fetchSchools();
+  }, [fetchSchools]);
+
+  // Otomatik arama kaldırıldı - sadece Enter'a basıldığında arama yapılacak
+
+  // Veri yükleme fonksiyonu
+  const loadMoreSchools = useCallback(async () => {
+    if (isLoadingMore || !hasMore || searchTerm.trim()) return;
+
     try {
       setIsLoadingMore(true);
-      const result = await getSchoolsPaginated(6, lastDocId);
+      const nextPage = currentPage + 1;
+      const result = await getSchoolsPaginated(nextPage, 6);
+
       if (result.schools.length > 0) {
         setSchools((prev) => [...prev, ...result.schools]);
-        setLastDocId(result.lastDoc);
+        setCurrentPage(nextPage);
         setHasMore(result.hasMore);
-        addLog({
-          title: "Daha Fazla Okul Yüklendi",
-          details: `Yeni okullar yüklendi. Eklenen: ${result.schools.length}`,
-        });
+        setTotalCount(result.totalCount);
       } else {
         setHasMore(false);
       }
     } catch (error) {
-      alert("Okullar yüklenirken hata oluştu");
+      console.error("Okullar yüklenirken hata oluştu:", error);
+      const errorMessage =
+        error.message || "Okullar yüklenirken bir hata oluştu!";
+      alert(errorMessage);
     } finally {
       setIsLoadingMore(false);
     }
-  }, [lastDocId, hasMore, isLoadingMore]);
+  }, [currentPage, hasMore, isLoadingMore, searchTerm]);
 
-  useEffect(() => {
-    const fetchInitialSchools = async () => {
-      setLoading(true);
-      try {
-        const result = await getSchoolsPaginated(6);
-        setSchools(result.schools);
-        setLastDocId(result.lastDoc);
-        setHasMore(result.hasMore);
-        addLog({
-          title: "Okullar Yüklendi",
-          details: `İlk sayfa okullar yüklendi. Toplam: ${result.schools.length}`,
-        });
-      } catch (err) {
-        alert("Okullar yüklenirken hata oluştu");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchInitialSchools();
-  }, []);
-
+  // Intersection Observer kurulumu
   useEffect(() => {
     if (loading) return;
+
     const options = {
       root: null,
       rootMargin: "20px",
       threshold: 0.1,
     };
-    observer.current = new window.IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+
+    observer.current = new IntersectionObserver((entries) => {
+      if (
+        entries[0].isIntersecting &&
+        hasMore &&
+        !isLoadingMore &&
+        !searchTerm.trim()
+      ) {
         loadMoreSchools();
       }
     }, options);
+
     if (loadingRef.current) {
       observer.current.observe(loadingRef.current);
     }
+
     return () => {
       if (observer.current) {
         observer.current.disconnect();
       }
     };
-  }, [loading, hasMore, isLoadingMore, loadMoreSchools]);
+  }, [loading, hasMore, isLoadingMore, loadMoreSchools, searchTerm]);
 
   // Modal açıldığında ilk değeri ayarla
   useEffect(() => {
     if (modalOpen) {
-      setModalCredit(modalInitialCredit || "");
+      console.log("Modal açıldı - modalCredit sıfırlanıyor");
+      setModalCredit("");
       setNewCredit(null);
     }
-  }, [modalOpen, modalInitialCredit]);
+  }, [modalOpen]);
 
   // ESC ile kapama
   useEffect(() => {
@@ -114,7 +170,9 @@ const AddCredi = () => {
         setModalOpen(false);
         addLog({
           title: "Kredi Ata Modal ESC ile Kapatıldı",
-          details: `${modalSchool?.name || modalSchool?.okulAdi || "Bilinmeyen"} (${modalSchool?.id || "-"}) için modal ESC ile kapatıldı.`,
+          details: `${modalSchool?.okul_adi || "Bilinmeyen"} (${
+            modalSchool?.id || "-"
+          }) için modal ESC ile kapatıldı.`,
         });
       }
     };
@@ -133,7 +191,9 @@ const AddCredi = () => {
         setModalOpen(false);
         addLog({
           title: "Kredi Ata Modal Dışarı Tıklama ile Kapatıldı",
-          details: `${modalSchool?.name || modalSchool?.okulAdi || "Bilinmeyen"} (${modalSchool?.id || "-"}) için modal dışarı tıklama ile kapatıldı.`,
+          details: `${modalSchool?.okul_adi || "Bilinmeyen"} (${
+            modalSchool?.id || "-"
+          }) için modal dışarı tıklama ile kapatıldı.`,
         });
       }
     };
@@ -146,41 +206,45 @@ const AddCredi = () => {
   return (
     <div>
       <AdminHeader title="Kredi Ekle" />
+
+      {/* Arama ve İstatistik Bölümü */}
       <div className="mb-8">
         <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <FormField
                 type="text"
-                placeholder="Okul ara..."
+                placeholder="Okul ara... (Enter'a basın)"
                 value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  addLog({
-                    title: "Okul Arama Yapıldı",
-                    details: `Aranan terim: ${e.target.value}`,
-                  });
-                }}
+                onChange={handleSearchChange}
+                onKeyDown={handleSearchSubmit}
                 icon="search"
                 delay={0}
               />
             </div>
             <div className="flex items-center justify-end">
               <span className="text-sm bg-blue-50 text-blue-600 py-2 px-4 rounded-lg font-medium">
-                Toplam {filteredSchools.length} okul listeleniyor
+                Toplam {totalCount} okul
               </span>
             </div>
           </div>
         </div>
       </div>
+
       {/* Okul kartları */}
       <div className="space-y-4">
         {loading ? (
           <Loader className="h-24" />
-        ) : filteredSchools.length === 0 ? (
-          <div>Hiç okul bulunamadı.</div>
+        ) : schools.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="text-gray-400 text-lg">
+              {searchTerm
+                ? "Arama kriterine uygun okul bulunamadı"
+                : "Henüz okul eklenmemiş"}
+            </div>
+          </div>
         ) : (
-          filteredSchools.map((school, idx) => (
+          schools.map((school, idx) => (
             <motion.div
               key={school.id}
               initial={{ opacity: 0 }}
@@ -191,34 +255,61 @@ const AddCredi = () => {
                 type: "spring",
                 stiffness: 60,
               }}
-              className="bg-white rounded-xl transition-all duration-150 hover:shadow-lg hover:-translate-y-1 p-4 flex items-center gap-4"
+              className="bg-white rounded-xl transition-all duration-150 hover:shadow-lg hover:-translate-y-1 p-6"
             >
-              <div className="flex-1 font-medium text-gray-800">
-                {school.name || school.okulAdi}
-              </div>
-              <div className="text-blue-700 font-semibold">
-                {school.kredi || 0} kredi
-              </div>
-              <div>
-                <button
-                  className="bg-blue-500 text-white px-3 py-1 rounded cursor-pointer transition-transform duration-200 hover:scale-110"
-                  onClick={() => {
-                    setModalSchool(school);
-                    setModalInitialCredit("");
-                    setModalCredit("");
-                    setModalOpen(true);
-                    addLog({
-                      title: "Kredi Ata Modal Açıldı",
-                      details: `${school.name || school.okulAdi} (${school.id}) için modal açıldı.`,
-                    });
-                  }}
-                >
-                  Kredi Ata
-                </button>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    {school.okul_adi}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-gray-600">
+                    <div className="flex items-center">
+                      <FiUsers className="mr-2 flex-shrink-0 text-blue-500" />
+                      <span>{school.ogrenci_sayisi} Öğrenci</span>
+                    </div>
+                    <div className="flex items-center">
+                      <FiMapPin className="mr-2 flex-shrink-0 text-blue-500" />
+                      <span>
+                        {school.il} / {school.ilce}
+                      </span>
+                    </div>
+                    <div className="flex items-center">
+                      <FiPhone className="mr-2 flex-shrink-0 text-blue-500" />
+                      <span>{school.telefon}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <FiMail className="mr-2 flex-shrink-0 text-blue-500" />
+                      <span>{school.eposta}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <FiCalendar className="mr-2 flex-shrink-0 text-blue-500" />
+                      <span>{school.okul_sistem_kayit_tarihi}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-3">
+                  <div className="text-blue-700 font-semibold text-lg">
+                    {sayiFormatla(school.kredi || 0)} kredi
+                  </div>
+                  <button
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:scale-105"
+                    onClick={() => {
+                      setModalSchool(school);
+                      setModalOpen(true);
+                      addLog({
+                        title: "Kredi Ata Modal Açıldı",
+                        details: `${school.okul_adi} (${school.id}) için modal açıldı.`,
+                      });
+                    }}
+                  >
+                    Kredi Ata
+                  </button>
+                </div>
               </div>
             </motion.div>
           ))
         )}
+
         {/* Infinite scroll loader */}
         {hasMore && !searchTerm && !loading && (
           <div ref={loadingRef} className="py-4">
@@ -226,171 +317,321 @@ const AddCredi = () => {
           </div>
         )}
       </div>
+
       {/* Modal */}
-      <div
-        className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${
-          modalOpen ? "visible bg-black/40" : "invisible bg-transparent"
-        }`}
-        style={{ pointerEvents: modalOpen ? "auto" : "none" }}
-      >
-        <div
-          ref={modalRef}
-          className={`bg-white rounded-xl shadow-lg p-8 w-full max-w-md transform transition-all duration-300 ${
-            modalOpen ? "scale-100 opacity-100" : "scale-90 opacity-0"
-          }`}
-          style={{ transitionProperty: "opacity, transform" }}
-        >
-          <h2 className="text-xl font-semibold mb-4 text-center">
-            {(modalSchool?.name || modalSchool?.okulAdi) + " için Kredi Ata"}
-          </h2>
-          {typeof modalSchool?.kredi !== "undefined" && (
-            <div className="text-center mb-4">
-              <span className="inline-block text-base font-bold text-blue-700 bg-blue-50 px-4 py-2 rounded-lg shadow-sm">
-                Mevcut Kredi: {modalSchool.kredi}
-              </span>
-            </div>
-          )}
-          <FormField
-            type="number"
-            label="Kredi miktarı"
-            placeholder="Kredi miktarı giriniz"
-            value={modalCredit}
-            onChange={(e) => setModalCredit(e.target.value)}
-            className="mb-2 hide-number-arrows"
-            min={0}
-            max={999999}
-            autoFocus
-          />
-          <div className="flex justify-center gap-4 mb-4">
-            <div className="flex flex-col justify-center items-center gap-4">
-              <div className="flex flex-row justify-center items-center gap-4">
-                <button
-                  className="bg-blue-500 hover:bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl font-bold shadow transition-transform duration-150 hover:scale-110 cursor-pointer"
-                  style={{ lineHeight: 1 }}
-                  onClick={() => {
-                    if (!modalSchool) return;
-                    if (modalCredit === "" || isNaN(Number(modalCredit)))
-                      return;
-                    const mevcut =
-                      newCredit !== null
-                        ? newCredit
-                        : Number(modalSchool.kredi) || 0;
-                    const girilen = Number(modalCredit);
-                    setNewCredit(mevcut + girilen);
-                    setModalCredit("");
-                    addLog({
-                      title: "Kredi Eklendi (Modal)",
-                      details: `${modalSchool.name || modalSchool.okulAdi} (${modalSchool.id}) için ${girilen} kredi eklendi. Yeni kredi: ${mevcut + girilen}`,
-                    });
-                  }}
-                  type="button"
-                  title="Ekle"
-                >
-                  <span className="flex items-center justify-center w-full h-full relative -top-1">
-                    +
-                  </span>
-                </button>
-                <button
-                  className="bg-red-500 hover:bg-red-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl font-bold shadow transition-transform duration-150 hover:scale-110 cursor-pointer"
-                  style={{ lineHeight: 1 }}
-                  onClick={() => {
-                    if (!modalSchool) return;
-                    if (modalCredit === "" || isNaN(Number(modalCredit)))
-                      return;
-                    const mevcut =
-                      newCredit !== null
-                        ? newCredit
-                        : Number(modalSchool.kredi) || 0;
-                    const girilen = Number(modalCredit);
-                    setNewCredit(mevcut - girilen);
-                    setModalCredit("");
-                    addLog({
-                      title: "Kredi Çıkarıldı (Modal)",
-                      details: `${modalSchool.name || modalSchool.okulAdi} (${modalSchool.id}) için ${girilen} kredi çıkarıldı. Yeni kredi: ${mevcut - girilen}`,
-                    });
-                  }}
-                  type="button"
-                  title="Çıkar"
-                >
-                  <span className="flex items-center justify-center w-full h-full relative -top-1">
-                    –
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-          {/* Yeni kredi büyük şekilde gösterilsin, sadece input boş değilse ve newCredit null değilse */}
-          {modalCredit === "" && newCredit === null
-            ? null
-            : newCredit !== null && (
-                <div className="text-center mb-4">
-                  <span
-                    className={`inline-block text-base font-bold px-6 py-3 rounded-lg shadow-sm ${
-                      newCredit < 0
-                        ? "text-red-500 bg-red-50"
-                        : "text-green-700 bg-green-50"
-                    }`}
+      <AnimatePresence>
+        {modalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            onClick={() => setModalOpen(false)}
+          >
+            <motion.div
+              ref={modalRef}
+              initial={{ scale: 0.8, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 20 }}
+              transition={{
+                type: "spring",
+                damping: 25,
+                stiffness: 300,
+                duration: 0.3,
+              }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-semibold">Kredi Ata</h2>
+                  </div>
+                  <button
+                    onClick={() => setModalOpen(false)}
+                    className="hover:bg-white/20 rounded-full p-1 transition-colors"
                   >
-                    Yeni Kredi: {newCredit}
-                  </span>
-                  {newCredit < 0 && (
-                    <div className="text-red-500 mt-2">
-                      Kredi 0'dan küçük olamaz!
-                    </div>
-                  )}
+                    <FiX className="text-lg" />
+                  </button>
                 </div>
-              )}
-          <div className="flex justify-end gap-2">
-            <button
-              className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 cursor-pointer"
-              onClick={() => {
-                setModalOpen(false);
-                addLog({
-                  title: "Kredi Ata Modal Kapatıldı",
-                  details: `${modalSchool?.name || modalSchool?.okulAdi || "Bilinmeyen"} (${modalSchool?.id || "-"}) için modal kapatıldı.`,
-                });
-              }}
-              type="button"
-            >
-              İptal
-            </button>
-            <button
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 cursor-pointer"
-              onClick={async () => {
-                if (!modalSchool) return;
-                if (newCredit === null || isNaN(newCredit) || newCredit < 0)
-                  return;
-                setLoading(true);
-                try {
-                  await updateSchool(modalSchool.id, {
-                    ...modalSchool,
-                    kredi: newCredit,
-                  });
-                  setSchools((prev) =>
-                    prev.map((s) =>
-                      s.id === modalSchool.id ? { ...s, kredi: newCredit } : s
-                    )
-                  );
-                  addLog({
-                    title: "Okula Kredi Kaydedildi",
-                    details: `${modalSchool.name || modalSchool.okulAdi} (${modalSchool.id}) için yeni kredi: ${newCredit}`,
-                  });
-                  setModalOpen(false);
-                } catch (err) {
-                  alert(err.message);
-                } finally {
-                  setLoading(false);
-                }
-              }}
-              type="button"
-              disabled={newCredit === null || isNaN(newCredit) || newCredit < 0}
-            >
-              Kaydet
-            </button>
-          </div>
-        </div>
-      </div>
-      <style jsx global>{`
+                <div className="mt-2 flex items-center gap-2 text-blue-100">
+                  <span className="text-sm font-medium">
+                    {modalSchool?.okul_adi}
+                  </span>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Sol Taraf - Kredi Bilgileri */}
+                  <div>
+                    {/* Mevcut Kredi */}
+                    {typeof modalSchool?.kredi !== "undefined" && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="text-center mb-6"
+                      >
+                        <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-3 rounded-xl border border-blue-200">
+                          <span className="font-semibold">
+                            Mevcut: {sayiFormatla(modalSchool.kredi || 0)} kredi
+                          </span>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* Kredi Input */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className="mb-6"
+                    >
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Kredi Miktarı
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={modalCredit}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Sadece tam sayıları kabul et
+                            if (value === "" || /^\d+$/.test(value)) {
+                              setModalCredit(value);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            // Sadece sayı, backspace, delete, arrow keys ve tab'e izin ver
+                            if (
+                              !/[\d\b\-\t]/.test(e.key) &&
+                              ![
+                                "ArrowLeft",
+                                "ArrowRight",
+                                "ArrowUp",
+                                "ArrowDown",
+                                "Tab",
+                              ].includes(e.key)
+                            ) {
+                              e.preventDefault();
+                            }
+                          }}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-white transition-all duration-300 ease-in-out focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100 hide-number-arrows text-center text-lg font-medium"
+                          min={0}
+                          max={999999}
+                          step={1}
+                          autoFocus
+                        />
+                      </div>
+                    </motion.div>
+
+                    {/* Kredi Butonları */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="flex justify-center gap-4 mb-6"
+                    >
+                      <button
+                        className="bg-red-500 hover:bg-red-600 text-white rounded-full w-14 h-14 flex items-center justify-center text-2xl font-bold shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl cursor-pointer"
+                        onClick={() => {
+                          if (!modalSchool) return;
+                          if (modalCredit === "" || isNaN(Number(modalCredit)))
+                            return;
+                          // Ondalıklı sayı kontrolü
+                          if (!Number.isInteger(Number(modalCredit))) return;
+                          const mevcut = Number(modalSchool.kredi) || 0;
+                          const girilen = Number(modalCredit);
+                          setNewCredit(mevcut - girilen);
+                          addLog({
+                            title: "Kredi Çıkarıldı (Modal)",
+                            details: `${modalSchool.okul_adi} (${
+                              modalSchool.id
+                            }) için ${girilen} kredi çıkarıldı. Yeni kredi: ${
+                              mevcut - girilen
+                            }`,
+                          });
+                        }}
+                        type="button"
+                        title="Çıkar"
+                      >
+                        <FiMinus />
+                      </button>
+                      <button
+                        className="bg-green-500 hover:bg-green-600 text-white rounded-full w-14 h-14 flex items-center justify-center text-2xl font-bold shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl cursor-pointer"
+                        onClick={() => {
+                          if (!modalSchool) return;
+                          if (modalCredit === "" || isNaN(Number(modalCredit)))
+                            return;
+                          // Ondalıklı sayı kontrolü
+                          if (!Number.isInteger(Number(modalCredit))) return;
+                          const mevcut = Number(modalSchool.kredi) || 0;
+                          const girilen = Number(modalCredit);
+                          setNewCredit(mevcut + girilen);
+                          addLog({
+                            title: "Kredi Eklendi (Modal)",
+                            details: `${modalSchool.okul_adi} (${
+                              modalSchool.id
+                            }) için ${girilen} kredi eklendi. Yeni kredi: ${
+                              mevcut + girilen
+                            }`,
+                          });
+                        }}
+                        type="button"
+                        title="Ekle"
+                      >
+                        <FiPlus />
+                      </button>
+                    </motion.div>
+                  </div>
+
+                  {/* Sağ Taraf - Yeni Kredi Gösterimi ve Butonlar */}
+                  <div className="flex flex-col justify-between">
+                    {/* Yeni Kredi Gösterimi */}
+                    <AnimatePresence>
+                      {modalCredit !== "" && newCredit !== null && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="text-center mb-6 overflow-hidden"
+                        >
+                          <div
+                            className={`inline-flex items-center gap-2 px-6 py-3 rounded-xl border-2 ${
+                              newCredit < 0
+                                ? "text-red-600 bg-red-50 border-red-200"
+                                : "text-green-600 bg-green-50 border-green-200"
+                            }`}
+                          >
+                            <span className="font-semibold">
+                              Yeni Kredi: {sayiFormatla(newCredit)}
+                            </span>
+                          </div>
+                          {newCredit < 0 && (
+                            <motion.div
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className="text-red-500 mt-3 text-sm font-medium"
+                            >
+                              ⚠️ Kredi 0'dan küçük olamaz!
+                            </motion.div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Modal Footer */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 }}
+                      className="flex gap-3"
+                    >
+                      <button
+                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-medium transition-all duration-200 hover:shadow-md cursor-pointer"
+                        onClick={() => {
+                          setModalOpen(false);
+                          addLog({
+                            title: "Kredi Ata Modal Kapatıldı",
+                            details: `${
+                              modalSchool?.okul_adi || "Bilinmeyen"
+                            } (${
+                              modalSchool?.id || "-"
+                            }) için modal kapatıldı.`,
+                          });
+                        }}
+                        type="button"
+                      >
+                        <FiX className="inline mr-2" />
+                        İptal
+                      </button>
+                      <button
+                        className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        onClick={async () => {
+                          if (!modalSchool) return;
+                          if (!modalCredit) return;
+                          if (isNaN(Number(modalCredit))) return;
+                          if (Number(modalCredit) <= 0) return;
+                          // Ondalıklı sayı kontrolü
+                          if (!Number.isInteger(Number(modalCredit))) return;
+                          if (newCredit === null) return;
+                          if (newCredit < 0) return;
+
+                          setLoading(true);
+                          try {
+                            const currentCredit = Number(
+                              modalSchool.kredi || 0
+                            );
+                            // newCredit zaten hesaplanmış durumda, sadece farkı al
+                            const creditDifference = newCredit - currentCredit;
+
+                            const result = await addCreditToSchool(
+                              modalSchool.id,
+                              creditDifference
+                            );
+
+                            setSchools((prev) =>
+                              prev.map((s) =>
+                                s.id === modalSchool.id
+                                  ? { ...s, kredi: newCredit }
+                                  : s
+                              )
+                            );
+
+                            const actionText =
+                              creditDifference > 0 ? "eklendi" : "çıkarıldı";
+                            const actionAmount = Math.abs(creditDifference);
+
+                            addLog({
+                              title: "Okula Kredi Kaydedildi",
+                              details: `${modalSchool.okul_adi} (${modalSchool.id}) için ${actionAmount} kredi ${actionText}. Yeni kredi: ${newCredit}`,
+                            });
+
+                            toast.success(
+                              `${modalSchool.okul_adi} için ${sayiFormatla(
+                                actionAmount
+                              )} kredi başarıyla ${actionText}!`
+                            );
+
+                            setModalOpen(false);
+                            setModalCredit("");
+                            setNewCredit(null);
+                          } catch (err) {
+                            alert(err.message);
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        type="button"
+                        disabled={
+                          loading || (newCredit !== null && newCredit < 0)
+                        }
+                      >
+                        {loading ? (
+                          <Loader className="h-5 w-5 text-white" />
+                        ) : (
+                          <>
+                            <FiSave className="inline mr-2" />
+                            Kaydet
+                          </>
+                        )}
+                      </button>
+                    </motion.div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <style>{`
         input[type="number"].hide-number-arrows::-webkit-inner-spin-button,
         input[type="number"].hide-number-arrows::-webkit-outer-spin-button {
           -webkit-appearance: none;

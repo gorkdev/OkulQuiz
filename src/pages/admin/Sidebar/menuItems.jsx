@@ -42,12 +42,12 @@ export const menuItems = [
     submenu: [
       {
         name: "Tüm Okullar",
-        to: "/admin/schools",
+        to: "/admin/okullar",
         icon: <CiBoxList size={18} />,
       },
       {
         name: "Yeni Okul Ekle",
-        to: "/admin/schools/add",
+        to: "/admin/okullar/ekle",
         icon: <IoIosAddCircleOutline size={18} />,
       },
     ],
@@ -58,12 +58,12 @@ export const menuItems = [
     submenu: [
       {
         name: "Kredi Ekle",
-        to: "/admin/credits/add",
+        to: "/admin/krediler/ekle",
         icon: <IoIosAddCircleOutline size={18} />,
       },
       {
         name: "Kredi Geçmişi",
-        to: "/admin/credits",
+        to: "/admin/krediler",
         icon: <MdHistory size={18} />,
       },
     ],
@@ -74,12 +74,12 @@ export const menuItems = [
     submenu: [
       {
         name: "Tüm Quizler",
-        to: "/admin/quiz",
+        to: "/admin/quizler",
         icon: <CiBoxList size={18} />,
       },
       {
         name: "Yeni Quiz Ekle",
-        to: "/admin/quiz/add",
+        to: "/admin/quizler/ekle",
         icon: <IoIosAddCircleOutline size={18} />,
       },
     ],
@@ -90,12 +90,12 @@ export const menuItems = [
     submenu: [
       {
         name: "Tüm Kategoriler",
-        to: "/admin/categories",
+        to: "/admin/kategoriler",
         icon: <CiBoxList size={18} />,
       },
       {
         name: "Yeni Kategori Ekle",
-        to: "/admin/categories/add",
+        to: "/admin/kategoriler/ekle",
         icon: <IoIosAddCircleOutline size={18} />,
       },
     ],
@@ -106,24 +106,24 @@ export const menuItems = [
     submenu: [
       {
         name: "Tüm Sorular",
-        to: "/admin/questions",
+        to: "/admin/sorular",
         icon: <CiBoxList size={18} />,
       },
       {
         name: "Yeni Soru Ekle",
-        to: "/admin/questions/add",
+        to: "/admin/sorular/ekle",
         icon: <IoIosAddCircleOutline size={18} />,
       },
     ],
   },
   {
     name: "Log Geçmişi",
-    to: "/admin/logs",
+    to: "/admin/loglar",
     icon: <MdHistory size={20} />,
   },
   {
     name: "Ayarlar",
-    to: "/admin/settings",
+    to: "/admin/ayarlar",
     icon: <FiSettings size={20} />,
   },
 ];

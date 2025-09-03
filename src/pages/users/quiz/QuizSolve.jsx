@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import { getQuizById } from "../../../services/firebase/questionService";
-import { getQuestionsByIds } from "../../../services/firebase/questionService";
+import { getQuizById } from "../../../services/mysql/quizService";
+import { getQuestionsByIds } from "../../../services/mysql/questionService";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
 import { IoIosWarning } from "react-icons/io";

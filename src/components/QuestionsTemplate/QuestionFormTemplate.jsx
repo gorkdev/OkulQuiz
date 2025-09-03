@@ -5,7 +5,7 @@ import FormField from "../FormTemplate/FormField";
 import CustomDropdown from "../FormTemplate/CustomDropdown";
 import CustomRadio from "../FormTemplate/CustomRadio";
 import CustomCheckbox from "../FormTemplate/CustomCheckbox";
-import { createQuestion } from "../../services/firebase/questionService";
+import { createQuestion } from "../../services/mysql/questionService";
 import { toast } from "react-toastify";
 // Benzersiz id üretici
 const generateOptionId = () =>

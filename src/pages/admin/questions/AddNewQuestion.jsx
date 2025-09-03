@@ -4,12 +4,12 @@ import FormTemplate from "@/components/FormTemplate/FormTemplate";
 import CustomDropdown from "@/components/FormTemplate/CustomDropdown";
 import FormField from "@/components/FormTemplate/FormField";
 import Loader from "@/components/Loader";
-import { getCategoriesPaginated } from "@/services/firebase/categoryService";
+import { getCategoriesPaginated } from "@/services/mysql/categoryService";
 import QuestionFormTemplate from "@/components/QuestionsTemplate/QuestionFormTemplate";
 
 // Kategori adında veya açıklamasında 'görsel' veya 'görselli' geçenler görselli, diğerleri sesli kabul edilir
 function getQuestionTypeFromCategory(category) {
-  const name = (category.kategoriAdi || "").toLowerCase();
+  const name = (category.kategori_adi || "").toLowerCase();
   const desc = (category.aciklama || "").toLowerCase();
   if (
     name.includes("görsel") ||
@@ -30,9 +30,10 @@ const AddNewQuestion = () => {
     const fetchCategories = async () => {
       setLoading(true);
       try {
-        const { categories } = await getCategoriesPaginated(50, null);
-        setCategories(categories);
+        const result = await getCategoriesPaginated(1, 50);
+        setCategories(result.categories || []);
       } catch (e) {
+        console.error("Kategoriler yüklenirken hata:", e);
         setCategories([]);
       } finally {
         setLoading(false);
@@ -71,7 +72,7 @@ const AddNewQuestion = () => {
                 onChange={(e) => setSelectedCategoryId(e.target.value)}
                 options={categories.map((cat) => ({
                   value: cat.id,
-                  label: cat.kategoriAdi,
+                  label: cat.kategori_adi,
                 }))}
                 required
               />

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import AdminHeader from "../../../components/AdminHeader/AdminHeader";
 import Loader from "../../../components/Loader";
-import { fetchLogs } from "../../../services/firebase/logService";
+import { fetchLogs } from "../../../services/mysql/logService";
 
 const PAGE_SIZE = 10;
 
@@ -42,25 +42,7 @@ const Logs = () => {
         lastDocRef.current = lastDoc;
       } catch (err) {
         console.error("Loglar yüklenirken hata:", err);
-        if (err && err.message && err.message.toLowerCase().includes("index")) {
-          setError(
-            "Firestore'da gerekli index oluşturulmalı. Konsolda detaylı bilgiye bakınız."
-          );
-          // Firestore index link genellikle error.message içinde olur, konsola yazdır.
-          if (err.message) {
-            const match = err.message.match(
-              /https:\/\/console\.firebase\.google\.com\/[\w\/-?&=%.]+/
-            );
-            if (match) {
-              console.log(
-                "Firestore index oluşturmak için tıklayın:",
-                match[0]
-              );
-            }
-          }
-        } else {
-          setError("Loglar yüklenirken hata oluştu.");
-        }
+        setError("Loglar yüklenirken hata oluştu.");
       } finally {
         setInitialLoading(false);
       }
@@ -111,21 +93,7 @@ const Logs = () => {
       lastDocRef.current = lastDoc;
     } catch (err) {
       console.error("Loglar yüklenirken hata:", err);
-      if (err && err.message && err.message.toLowerCase().includes("index")) {
-        setError(
-          "Firestore'da gerekli index oluşturulmalı. Konsolda detaylı bilgiye bakınız."
-        );
-        if (err.message) {
-          const match = err.message.match(
-            /https:\/\/console\.firebase\.google\.com\/[\w\/-?&=%.]+/
-          );
-          if (match) {
-            console.log("Firestore index oluşturmak için tıklayın:", match[0]);
-          }
-        }
-      } else {
-        setError("Loglar yüklenirken hata oluştu.");
-      }
+      setError("Loglar yüklenirken hata oluştu.");
     } finally {
       setLoading(false);
     }
@@ -206,13 +174,14 @@ const Logs = () => {
                         >
                           <td className="py-4 px-6 whitespace-nowrap rounded-l-xl align-top text-left">
                             <span className="block font-medium text-gray-700 group-hover:text-blue-700">
-                              {log.timestamp?.seconds
-                                ? new Date(
-                                    log.timestamp.seconds * 1000
-                                  ).toLocaleString("tr-TR", {
-                                    dateStyle: "short",
-                                    timeStyle: "short",
-                                  })
+                              {log.created_at
+                                ? new Date(log.created_at).toLocaleString(
+                                    "tr-TR",
+                                    {
+                                      dateStyle: "short",
+                                      timeStyle: "short",
+                                    }
+                                  )
                                 : "-"}
                             </span>
                           </td>

@@ -10,10 +10,8 @@ import { toast } from "react-toastify";
 import {
   addCategory,
   isCategoryNameTaken,
-} from "@/services/firebase/categoryService";
-import { storage } from "@/services/firebase/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { serverTimestamp } from "firebase/firestore";
+} from "@/services/mysql/categoryService";
+// Firebase import'ları kaldırıldı - MySQL kullanıyoruz
 
 const statusOptions = [
   { value: "aktif", label: "Aktif" },
@@ -136,12 +134,12 @@ const KategoriFormu = ({ initialValues, onSubmit: onSubmitProp, isEdit }) => {
     setAutoPlayAudio(e.target.checked);
   };
 
-  // Dosya yükleme yardımcı fonksiyonu
+  // Dosya yükleme yardımcı fonksiyonu - MySQL için basitleştirildi
   const uploadFileToStorage = async (file, path) => {
     if (!file) return null;
-    const storageRef = ref(storage, `${path}/${Date.now()}_${file.name}`);
-    await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
+    // MySQL için dosya yükleme işlemi basitleştirildi
+    // Gerçek uygulamada dosya upload API'si kullanılmalı
+    return `uploads/${path}/${Date.now()}_${file.name}`;
   };
 
   const onSubmit = async (data) => {
@@ -186,7 +184,7 @@ const KategoriFormu = ({ initialValues, onSubmit: onSubmitProp, isEdit }) => {
         preAudio: showPreAudio ? preAudioUrl : null,
         preImage: showPreImage ? preImageUrl : null,
         countdownSeconds: showCountdown ? countdownSeconds : null,
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
       };
       if (onSubmitProp) {
         await onSubmitProp(categoryData, reset);

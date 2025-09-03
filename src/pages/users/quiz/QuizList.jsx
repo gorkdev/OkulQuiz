@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getQuizzes } from "../../../services/firebase/quizService";
+import { getQuizzes } from "../../../services/mysql/quizService";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 

@@ -1,8 +1,20 @@
-import { db, storage } from './firebase';
-import { collection, addDoc, Timestamp, query, orderBy, limit, startAfter, getDocs, getDoc, doc, where } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from "./firebase";
+import {
+  collection,
+  addDoc,
+  Timestamp,
+  query,
+  orderBy,
+  limit,
+  startAfter,
+  getDocs,
+  getDoc,
+  doc,
+  where,
+} from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-// Tek bir dosyayı storage'a yükler ve URL döner
+// Tek bir dosyayı storage'a yük ler ve URL döner
 export async function uploadFileToStorage(file, path) {
   if (!file) return null;
   const storageRef = ref(storage, `${path}/${Date.now()}_${file.name}`);
@@ -12,7 +24,7 @@ export async function uploadFileToStorage(file, path) {
 
 // Firestore'a soru ekler
 export async function addQuestionToFirestore(questionData) {
-  const questionsRef = collection(db, 'Sorular');
+  const questionsRef = collection(db, "Sorular");
   const docRef = await addDoc(questionsRef, {
     ...questionData,
     createdAt: Timestamp.now(),
@@ -24,18 +36,18 @@ export async function addQuestionToFirestore(questionData) {
 export async function getQuestionsPaginated(pageSize = 10, lastDocId = null) {
   let questionsQuery;
   if (lastDocId) {
-    const lastDocRef = doc(db, 'Sorular', lastDocId);
+    const lastDocRef = doc(db, "Sorular", lastDocId);
     const lastDocSnap = await getDoc(lastDocRef);
     questionsQuery = query(
-      collection(db, 'Sorular'),
-      orderBy('createdAt', 'desc'),
+      collection(db, "Sorular"),
+      orderBy("createdAt", "desc"),
       startAfter(lastDocSnap),
       limit(pageSize)
     );
   } else {
     questionsQuery = query(
-      collection(db, 'Sorular'),
-      orderBy('createdAt', 'desc'),
+      collection(db, "Sorular"),
+      orderBy("createdAt", "desc"),
       limit(pageSize)
     );
   }
@@ -45,12 +57,17 @@ export async function getQuestionsPaginated(pageSize = 10, lastDocId = null) {
     ...doc.data(),
   }));
   const hasMore = questions.length === pageSize;
-  const lastDoc = questions.length > 0 ? questions[questions.length - 1].id : null;
+  const lastDoc =
+    questions.length > 0 ? questions[questions.length - 1].id : null;
   return { questions, hasMore, lastDoc };
 }
 
 // Firestore'da arama ile soruları getirir
-export async function searchQuestions({ search = "", pageSize = 10, lastDocSnap = null } = {}) {
+export async function searchQuestions({
+  search = "",
+  pageSize = 10,
+  lastDocSnap = null,
+} = {}) {
   if (!search) {
     // Arama yoksa normal paginated çek
     return await getQuestionsPaginated(pageSize, lastDocSnap);
@@ -75,11 +92,17 @@ export async function searchQuestions({ search = "", pageSize = 10, lastDocSnap 
       q1 = query(q1, startAfter(lastDocSnap.soruMetni));
     }
     const snap1 = await getDocs(q1);
-    snap1.docs.forEach(docu => allQuestionsMap.set(docu.id, { id: docu.id, ...docu.data() }));
+    snap1.docs.forEach((docu) =>
+      allQuestionsMap.set(docu.id, { id: docu.id, ...docu.data() })
+    );
     if (snap1.docs.length === pageSize) hasMore = true;
     if (snap1.docs.length > 0) lastDoc = snap1.docs[snap1.docs.length - 1];
   } catch (err) {
-    if (err.code === 'failed-precondition' || err.code === 'permission-denied' || err.message?.includes('index')) {
+    if (
+      err.code === "failed-precondition" ||
+      err.code === "permission-denied" ||
+      err.message?.includes("index")
+    ) {
       errorIndexLink = err.message.match(/https?:\/\/[^\s]+/g)?.[0];
     }
   }
@@ -97,11 +120,17 @@ export async function searchQuestions({ search = "", pageSize = 10, lastDocSnap 
       q2 = query(q2, startAfter(lastDocSnap["kategori.kategoriAdi"]));
     }
     const snap2 = await getDocs(q2);
-    snap2.docs.forEach(docu => allQuestionsMap.set(docu.id, { id: docu.id, ...docu.data() }));
+    snap2.docs.forEach((docu) =>
+      allQuestionsMap.set(docu.id, { id: docu.id, ...docu.data() })
+    );
     if (snap2.docs.length === pageSize) hasMore = true;
     if (snap2.docs.length > 0) lastDoc = snap2.docs[snap2.docs.length - 1];
   } catch (err) {
-    if (err.code === 'failed-precondition' || err.code === 'permission-denied' || err.message?.includes('index')) {
+    if (
+      err.code === "failed-precondition" ||
+      err.code === "permission-denied" ||
+      err.message?.includes("index")
+    ) {
       errorIndexLink = err.message.match(/https?:\/\/[^\s]+/g)?.[0];
     }
   }
@@ -119,11 +148,17 @@ export async function searchQuestions({ search = "", pageSize = 10, lastDocSnap 
       q3 = query(q3, startAfter(lastDocSnap.zorluk));
     }
     const snap3 = await getDocs(q3);
-    snap3.docs.forEach(docu => allQuestionsMap.set(docu.id, { id: docu.id, ...docu.data() }));
+    snap3.docs.forEach((docu) =>
+      allQuestionsMap.set(docu.id, { id: docu.id, ...docu.data() })
+    );
     if (snap3.docs.length === pageSize) hasMore = true;
     if (snap3.docs.length > 0) lastDoc = snap3.docs[snap3.docs.length - 1];
   } catch (err) {
-    if (err.code === 'failed-precondition' || err.code === 'permission-denied' || err.message?.includes('index')) {
+    if (
+      err.code === "failed-precondition" ||
+      err.code === "permission-denied" ||
+      err.message?.includes("index")
+    ) {
       errorIndexLink = err.message.match(/https?:\/\/[^\s]+/g)?.[0];
     }
   }
@@ -151,23 +186,27 @@ export async function getQuestionCountByCategoryName(kategoriAdi) {
  * @param {string|null} lastDocId
  * @returns {Promise<{questions: Array, hasMore: boolean, lastDoc: string|null}>}
  */
-export async function getQuestionsByCategoryPaginated(kategoriAdi, pageSize = 10, lastDocId = null) {
+export async function getQuestionsByCategoryPaginated(
+  kategoriAdi,
+  pageSize = 10,
+  lastDocId = null
+) {
   let questionsQuery;
   if (lastDocId) {
-    const lastDocRef = doc(db, 'Sorular', lastDocId);
+    const lastDocRef = doc(db, "Sorular", lastDocId);
     const lastDocSnap = await getDoc(lastDocRef);
     questionsQuery = query(
-      collection(db, 'Sorular'),
-      where('kategori.kategoriAdi', '==', kategoriAdi),
-      orderBy('createdAt', 'desc'),
+      collection(db, "Sorular"),
+      where("kategori.kategoriAdi", "==", kategoriAdi),
+      orderBy("createdAt", "desc"),
       startAfter(lastDocSnap),
       limit(pageSize)
     );
   } else {
     questionsQuery = query(
-      collection(db, 'Sorular'),
-      where('kategori.kategoriAdi', '==', kategoriAdi),
-      orderBy('createdAt', 'desc'),
+      collection(db, "Sorular"),
+      where("kategori.kategoriAdi", "==", kategoriAdi),
+      orderBy("createdAt", "desc"),
       limit(pageSize)
     );
   }
@@ -177,7 +216,8 @@ export async function getQuestionsByCategoryPaginated(kategoriAdi, pageSize = 10
     ...doc.data(),
   }));
   const hasMore = questions.length === pageSize;
-  const lastDoc = questions.length > 0 ? questions[questions.length - 1].id : null;
+  const lastDoc =
+    questions.length > 0 ? questions[questions.length - 1].id : null;
   return { questions, hasMore, lastDoc };
 }
 
@@ -187,7 +227,9 @@ export async function createQuestion(rawData) {
   let imageUrls = [];
   if (rawData.gorselVar && Array.isArray(rawData.gorseller)) {
     imageUrls = await Promise.all(
-      rawData.gorseller.map(imgObj => uploadFileToStorage(imgObj.file, 'question_images'))
+      rawData.gorseller.map((imgObj) =>
+        uploadFileToStorage(imgObj.file, "question_images")
+      )
     );
   } else {
     imageUrls = [];
@@ -196,7 +238,10 @@ export async function createQuestion(rawData) {
   // 2. Soru sesini yükle
   let questionAudioUrl = null;
   if (rawData.soruSesiVar && rawData.soruSesi) {
-    questionAudioUrl = await uploadFileToStorage(rawData.soruSesi, 'question_audios');
+    questionAudioUrl = await uploadFileToStorage(
+      rawData.soruSesi,
+      "question_audios"
+    );
   }
 
   // 3. Şık görselleri ve seslerini yükle
@@ -205,8 +250,16 @@ export async function createQuestion(rawData) {
         rawData.siklar.map(async (opt, idx) => {
           let imageUrl = null;
           let audioUrl = null;
-          if (opt.image) imageUrl = await uploadFileToStorage(opt.image, `option_images/${idx}`);
-          if (opt.audio) audioUrl = await uploadFileToStorage(opt.audio, `option_audios/${idx}`);
+          if (opt.image)
+            imageUrl = await uploadFileToStorage(
+              opt.image,
+              `option_images/${idx}`
+            );
+          if (opt.audio)
+            audioUrl = await uploadFileToStorage(
+              opt.audio,
+              `option_audios/${idx}`
+            );
           return {
             ...opt,
             image: imageUrl,
@@ -279,8 +332,9 @@ export const getQuizById = async (quizId) => {
  */
 export async function getQuestionsByIds(ids) {
   if (!Array.isArray(ids) || ids.length === 0) return [];
-  const promises = ids.map(id => getDoc(doc(db, 'Sorular', id)));
+  const promises = ids.map((id) => getDoc(doc(db, "Sorular", id)));
   const snaps = await Promise.all(promises);
-  return snaps.filter(snap => snap.exists()).map(snap => ({ id: snap.id, ...snap.data() }));
+  return snaps
+    .filter((snap) => snap.exists())
+    .map((snap) => ({ id: snap.id, ...snap.data() }));
 }
-

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import AdminHeader from "../../../components/AdminHeader/AdminHeader";
-import { getCategoriesPaginated } from "../../../services/firebase/categoryService";
-import { getQuestionsByCategoryPaginated } from "../../../services/firebase/questionService";
+import { getCategoriesPaginated } from "../../../services/mysql/categoryService";
+import { getQuestionsByCategoryPaginated } from "../../../services/mysql/questionService";
 import CustomCheckbox from "../../../components/FormTemplate/CustomCheckbox";
 import FormField from "../../../components/FormTemplate/FormField";
 import Loader from "../../../components/Loader";
@@ -19,13 +19,13 @@ import { RiDragMove2Fill } from "react-icons/ri";
 
 import { useDrop, useDrag } from "react-dnd";
 import { ItemTypes } from "./ItemTypes";
-import { addQuiz } from "../../../services/firebase/quizService";
+import { addQuiz } from "../../../services/mysql/quizService";
 import { toast } from "react-toastify";
 
 const CATEGORY_PANEL_WIDTH = "w-96";
 
 const CategoryQuestions = ({
-  kategoriAdi,
+  kategori_adi,
   selectedQuestions,
   onSelect,
   search,
@@ -38,7 +38,7 @@ const CategoryQuestions = ({
       lastDocId = questions[questions.length - 1].id;
     }
     const { questions } = await getQuestionsByCategoryPaginated(
-      kategoriAdi,
+      kategori_adi,
       pageSize,
       lastDocId
     );
@@ -56,7 +56,7 @@ const CategoryQuestions = ({
     setPage(1);
     setHasMore(true);
     setFirstLoaded(false);
-  }, [kategoriAdi, search]);
+  }, [kategori_adi, search]);
 
   // Soru yükle
   useEffect(() => {
@@ -76,7 +76,7 @@ const CategoryQuestions = ({
       cancelled = true;
     };
     // eslint-disable-next-line
-  }, [page, kategoriAdi, search]);
+  }, [page, kategori_adi, search]);
 
   // Scroll ile yeni sayfa yükle
   const listRef = React.useRef();
@@ -372,7 +372,7 @@ const CreateNewQuiz = () => {
   const filteredCategories = useMemo(() => {
     if (!categorySearch) return categories;
     return categories.filter((cat) =>
-      cat.kategoriAdi.toLowerCase().includes(categorySearch.toLowerCase())
+      cat.kategori_adi.toLowerCase().includes(categorySearch.toLowerCase())
     );
   }, [categories, categorySearch]);
 
@@ -538,7 +538,7 @@ const CreateNewQuiz = () => {
                         onClick={() => setOpenCategory(isOpen ? null : cat.id)}
                       >
                         <span className="font-semibold text-base text-gray-800 flex-1">
-                          {cat.kategoriAdi}
+                          {cat.kategori_adi}
                         </span>
                         <span className="ml-auto text-gray-400">
                           {isOpen ? <FiChevronDown /> : <FiChevronRight />}
@@ -547,7 +547,7 @@ const CreateNewQuiz = () => {
                       <AnimatePresence initial={false}>
                         {isOpen && (
                           <CategoryQuestions
-                            kategoriAdi={cat.kategoriAdi}
+                            kategori_adi={cat.kategori_adi}
                             selectedQuestions={
                               selectedQuestionsByCategory[cat.id] || []
                             }
@@ -626,7 +626,7 @@ const CreateNewQuiz = () => {
                         key={catId}
                         id={catId}
                         index={catIdx}
-                        title={cat?.kategoriAdi}
+                        title={cat?.kategori_adi}
                         questions={qObjs}
                         moveCategory={moveCategory}
                         moveQuestion={moveQuestion}

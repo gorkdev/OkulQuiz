@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import AdminHeader from "@/components/AdminHeader/AdminHeader";
-import { addSchool, isUsernameTaken } from "@/services/firebase/schoolService";
+import {
+  addSchool,
+  isUsernameTaken,
+  isEmailTaken,
+  isPhoneTaken,
+} from "@/services/mysql/schoolService";
 import { toast } from "react-toastify";
 import FormTemplate from "@/components/FormTemplate/FormTemplate";
 import FormField from "@/components/FormTemplate/FormField";
@@ -69,15 +74,6 @@ const defaultValues = {
   ogrenciSayisi: "",
   gorusulecekYetkili: "",
   yetkiliTelefon: "",
-  okulSistemKayitTarihi: new Date().toLocaleString("tr-TR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }),
   durum: "aktif",
   kullaniciAdi: generateUsername(),
   sifre: generatePassword(),
@@ -146,18 +142,35 @@ const AddSchool = () => {
         setLoading(false);
         return;
       }
+
+      // E-posta adresi benzersiz mi kontrol et
+      const emailTaken = await isEmailTaken(data.eposta);
+      if (emailTaken) {
+        toast.error("Bu e-posta adresi zaten kullanılıyor.");
+        setLoading(false);
+        return;
+      }
+
+      // Telefon numarası benzersiz mi kontrol et
+      const phoneTaken = await isPhoneTaken(data.telefon);
+      if (phoneTaken) {
+        toast.error("Bu telefon numarası zaten kullanılıyor.");
+        setLoading(false);
+        return;
+      }
+
+      // Yetkili telefon numarası benzersiz mi kontrol et (eğer girilmişse)
+      if (data.yetkiliTelefon && data.yetkiliTelefon.trim()) {
+        const yetkiliPhoneTaken = await isPhoneTaken(data.yetkiliTelefon);
+        if (yetkiliPhoneTaken) {
+          toast.error("Bu yetkili telefon numarası zaten kullanılıyor.");
+          setLoading(false);
+          return;
+        }
+      }
       const schoolData = {
         ...defaultValues,
         ...data,
-        okulSistemKayitTarihi: new Date().toLocaleString("tr-TR", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false,
-        }),
         kullaniciAdi: data.kullaniciAdi,
         sifre: data.sifre,
       };
@@ -170,7 +183,9 @@ const AddSchool = () => {
       });
     } catch (error) {
       console.error("Hata oluştu:", error);
-      toast.error("Okul eklenirken bir hata oluştu!");
+      // Backend'den gelen hata mesajını kullan
+      const errorMessage = error.message || "Okul eklenirken bir hata oluştu!";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -288,6 +303,15 @@ const AddSchool = () => {
                   error={errors.eposta?.message}
                   placeholder="okul@example.com"
                   delay={0.5}
+                  onBlur={async (e) => {
+                    const email = e.target.value;
+                    if (email && email.includes("@")) {
+                      const emailTaken = await isEmailTaken(email);
+                      if (emailTaken) {
+                        toast.error("Bu e-posta adresi zaten kullanılıyor.");
+                      }
+                    }
+                  }}
                   {...field}
                 />
               )}
@@ -306,6 +330,15 @@ const AddSchool = () => {
                   placeholder="0555 555 55 55"
                   delay={0.5}
                   onChange={(e) => handlePhoneChange(e, field)}
+                  onBlur={async (e) => {
+                    const phone = e.target.value;
+                    if (phone && phone.length >= 10) {
+                      const phoneTaken = await isPhoneTaken(phone);
+                      if (phoneTaken) {
+                        toast.error("Bu telefon numarası zaten kullanılıyor.");
+                      }
+                    }
+                  }}
                   value={field.value}
                   maxLength={14}
                 />
@@ -378,6 +411,15 @@ const AddSchool = () => {
                   placeholder="0555 555 55 55"
                   delay={0.7}
                   onChange={(e) => handlePhoneChange(e, field)}
+                  onBlur={async (e) => {
+                    const phone = e.target.value;
+                    if (phone && phone.length >= 10) {
+                      const phoneTaken = await isPhoneTaken(phone);
+                      if (phoneTaken) {
+                        toast.error("Bu telefon numarası zaten kullanılıyor.");
+                      }
+                    }
+                  }}
                   value={field.value}
                   maxLength={14}
                 />
@@ -395,6 +437,15 @@ const AddSchool = () => {
                   error={errors.kullaniciAdi?.message}
                   placeholder="Kullanıcı Adı"
                   delay={0.15}
+                  onBlur={async (e) => {
+                    const username = e.target.value;
+                    if (username) {
+                      const taken = await isUsernameTaken(username);
+                      if (taken) {
+                        toast.error("Bu kullanıcı adı zaten kullanılıyor.");
+                      }
+                    }
+                  }}
                   {...field}
                 />
               )}

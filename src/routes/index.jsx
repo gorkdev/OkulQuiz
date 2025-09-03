@@ -15,6 +15,7 @@ import AddNewCategory from "../pages/admin/categories/AddNewCategory";
 import Categories from "../pages/admin/categories/Categories";
 import Questions from "../pages/admin/questions/Questions";
 import CreateNewQuiz from "../pages/admin/quiz/CreateNewQuiz";
+import Quizzes from "../pages/admin/quiz/Quizzes";
 import Profile from "../pages/users/Profile";
 import QuizList from "../pages/users/quiz/QuizList";
 import QuizSolve from "../pages/users/quiz/QuizSolve";
@@ -39,18 +40,18 @@ const router = createBrowserRouter([
     element: <AdminLayout />,
     children: [
       { index: true, element: <Dashboard /> },
-      { path: "schools", element: <Schools /> },
-      { path: "schools/add", element: <AddSchool /> },
-      { path: "credits", element: <Credits /> },
-      { path: "credits/add", element: <AddCredi /> },
-      { path: "quiz", element: <AddCredi /> },
-      { path: "quiz/add", element: <CreateNewQuiz /> },
-      { path: "categories", element: <Categories /> },
-      { path: "categories/add", element: <AddNewCategory /> },
-      { path: "questions", element: <Questions /> },
-      { path: "questions/add", element: <AddNewQuestion /> },
-      { path: "logs", element: <Logs /> },
-      { path: "settings", element: <Settings /> },
+      { path: "okullar", element: <Schools /> },
+      { path: "okullar/ekle", element: <AddSchool /> },
+      { path: "krediler", element: <Credits /> },
+      { path: "krediler/ekle", element: <AddCredi /> },
+      { path: "quizler", element: <Quizzes /> },
+      { path: "quizler/ekle", element: <CreateNewQuiz /> },
+      { path: "kategoriler", element: <Categories /> },
+      { path: "kategoriler/ekle", element: <AddNewCategory /> },
+      { path: "sorular", element: <Questions /> },
+      { path: "sorular/ekle", element: <AddNewQuestion /> },
+      { path: "loglar", element: <Logs /> },
+      { path: "ayarlar", element: <Settings /> },
       { path: "*", element: <NotFound /> },
     ],
   },

@@ -6,98 +6,137 @@ import {
   deleteSchool,
   setSchoolPassive,
   setSchoolActive,
-} from "@/services/firebase/schoolService";
+} from "@/services/mysql/schoolService";
+import { getCreditBySchoolName } from "@/services/mysql/creditService";
+import { tarihFormatla } from "@/hooks/tarihFormatla";
 import { toast } from "react-toastify";
 import {
-  FiCalendar,
-  FiMail,
-  FiPhone,
-  FiUsers,
-  FiMapPin,
-  FiChevronRight,
   FiX,
   FiTrash2,
   FiSave,
+  FiUsers,
+  FiMapPin,
+  FiPhone,
+  FiMail,
+  FiCalendar,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
-import FormField from "@/components/FormTemplate/FormField";
 import Loader from "@/components/Loader";
 import CustomDropdown from "@/components/FormTemplate/CustomDropdown";
+import FormField from "@/components/FormTemplate/FormField";
 import { CiPause1 } from "react-icons/ci";
 import { GoCheck } from "react-icons/go";
-
-// Türkçe harf duyarsız karşılaştırma için yardımcı fonksiyon
-function normalizeString(str) {
-  return String(str)
-    .toLocaleLowerCase("tr-TR")
-    .replace(/ı/g, "i")
-    .replace(/İ/g, "i");
-}
+import { SchoolsList } from "@/components/SchoolsList";
 
 const Schools = () => {
   const [loading, setLoading] = useState(true);
   const [schools, setSchools] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [lastDocId, setLastDocId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [editedSchool, setEditedSchool] = useState(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
+  const [schoolCredit, setSchoolCredit] = useState(null);
 
   const loadingRef = useRef(null);
   const observer = useRef(null);
-
-  // Arama fonksiyonu
-  const filteredSchools = schools.filter((school) =>
-    Object.values(school).some((value) =>
-      normalizeString(value).includes(normalizeString(searchTerm))
-    )
-  );
+  const searchInputRef = useRef(null);
 
   // Veri yükleme fonksiyonu
   const loadMoreSchools = useCallback(async () => {
-    if (isLoadingMore || !hasMore) return;
+    if (isLoadingMore || !hasMore || searchTerm.trim()) return;
 
     try {
       setIsLoadingMore(true);
-      const result = await getSchoolsPaginated(6, lastDocId);
+      const nextPage = currentPage + 1;
+      const result = await getSchoolsPaginated(nextPage, 6);
 
       if (result.schools.length > 0) {
         setSchools((prev) => [...prev, ...result.schools]);
-        setLastDocId(result.lastDoc);
+        setCurrentPage(nextPage);
         setHasMore(result.hasMore);
+        setTotalCount(result.totalCount);
       } else {
         setHasMore(false);
       }
     } catch (error) {
       console.error("Okullar yüklenirken hata oluştu:", error);
-      toast.error("Okullar yüklenirken bir hata oluştu!");
+      const errorMessage =
+        error.message || "Okullar yüklenirken bir hata oluştu!";
+      toast.error(errorMessage);
     } finally {
       setIsLoadingMore(false);
     }
-  }, [lastDocId, hasMore, isLoadingMore]);
+  }, [currentPage, hasMore, isLoadingMore, searchTerm]);
+
+  // Arama input değişikliği için callback
+  const handleSearchChange = useCallback((e) => {
+    setSearchTerm(e.target.value);
+  }, []);
+
+  // Arama fonksiyonunu useCallback ile optimize et
+  const fetchSchools = useCallback(async (search = searchTerm) => {
+    try {
+      setLoading(true);
+
+      if (!search.trim()) {
+        // Arama yoksa normal pagination ile yükle
+        const result = await getSchoolsPaginated(1, 6);
+        setSchools(result.schools);
+        setCurrentPage(1);
+        setHasMore(result.hasMore);
+        setTotalCount(result.totalCount);
+      } else {
+        // Arama varsa backend'den arama sonuçlarını getir
+        const result = await getSchoolsPaginated(1, 50, search);
+        setSchools(result.schools);
+        setCurrentPage(1);
+        setHasMore(false); // Arama sonuçlarında pagination yok
+        setTotalCount(result.totalCount);
+      }
+    } catch (error) {
+      console.error("Okullar yüklenirken hata oluştu:", error);
+      const errorMessage =
+        error.message || "Okullar yüklenirken bir hata oluştu!";
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+      // Arama tamamlandıktan sonra input'a focus ol
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
+    }
+  }, []);
+
+  // Enter'a basıldığında arama yap
+  const handleSearchSubmit = useCallback(
+    (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        fetchSchools(searchTerm);
+      }
+    },
+    [searchTerm, fetchSchools]
+  );
 
   // İlk yükleme
   useEffect(() => {
-    const fetchInitialSchools = async () => {
-      try {
-        setLoading(true);
-        const result = await getSchoolsPaginated(6);
-        setSchools(result.schools);
-        setLastDocId(result.lastDoc);
-        setHasMore(result.hasMore);
-      } catch (error) {
-        console.error("Okullar yüklenirken hata oluştu:", error);
-        toast.error("Okullar yüklenirken bir hata oluştu!");
-      } finally {
-        setLoading(false);
-      }
-    };
+    fetchSchools();
+  }, [fetchSchools]);
 
-    fetchInitialSchools();
+  // Sayfa yüklendiğinde input'a focus ol
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
   }, []);
+
+  // Otomatik arama kaldırıldı - sadece Enter'a basıldığında arama yapılacak
 
   // Intersection Observer kurulumu
   useEffect(() => {
@@ -110,7 +149,12 @@ const Schools = () => {
     };
 
     observer.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+      if (
+        entries[0].isIntersecting &&
+        hasMore &&
+        !isLoadingMore &&
+        !searchTerm.trim()
+      ) {
         loadMoreSchools();
       }
     }, options);
@@ -124,12 +168,7 @@ const Schools = () => {
         observer.current.disconnect();
       }
     };
-  }, [loading, hasMore, isLoadingMore, loadMoreSchools]);
-
-  // Arama yapıldığında scroll'u sıfırla
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [searchTerm]);
+  }, [loading, hasMore, isLoadingMore, loadMoreSchools, searchTerm]);
 
   useEffect(() => {
     if (isModalOpen) {
@@ -141,16 +180,25 @@ const Schools = () => {
     }
   }, [isModalOpen]);
 
-  const handleOpenModal = (school) => {
+  const handleOpenModal = useCallback(async (school) => {
     setSelectedSchool(school);
     setEditedSchool(school);
     setIsModalOpen(true);
-  };
+
+    try {
+      const credit = await getCreditBySchoolName(school.okul_adi);
+      setSchoolCredit(credit);
+    } catch (error) {
+      setSchoolCredit(null);
+    }
+  }, []);
 
   const handleCloseModal = () => {
     setSelectedSchool(null);
     setEditedSchool(null);
     setIsModalOpen(false);
+    setShowPassword(false);
+    setSchoolCredit(null);
   };
 
   const handleInputChange = (field, value) => {
@@ -163,7 +211,28 @@ const Schools = () => {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      await updateSchool(editedSchool.id, editedSchool);
+
+      // Backend'e gönderilecek veriyi hazırla (camelCase formatında)
+      const updateData = {
+        okulAdi: editedSchool.okul_adi,
+        okulTuru: editedSchool.okul_turu,
+        adres: editedSchool.adres,
+        ilce: editedSchool.ilce,
+        il: editedSchool.il,
+        eposta: editedSchool.eposta,
+        telefon: editedSchool.telefon,
+        website: editedSchool.website,
+        ogrenciSayisi: editedSchool.ogrenci_sayisi,
+        gorusulecekYetkili: editedSchool.gorusulecek_yetkili,
+        yetkiliTelefon: editedSchool.yetkili_telefon,
+        kullaniciAdi: editedSchool.kullanici_adi,
+        sifre: editedSchool.sifre,
+        durum: editedSchool.durum,
+      };
+
+      await updateSchool(editedSchool.id, updateData);
+
+      // Frontend state'ini güncelle
       setSchools(
         schools.map((school) =>
           school.id === editedSchool.id ? editedSchool : school
@@ -173,7 +242,9 @@ const Schools = () => {
       handleCloseModal();
     } catch (error) {
       console.error("Okul güncellenirken hata oluştu:", error);
-      toast.error("Okul güncellenirken bir hata oluştu!");
+      const errorMessage =
+        error.message || "Okul güncellenirken bir hata oluştu!";
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -185,6 +256,7 @@ const Schools = () => {
         setIsSaving(true);
         await deleteSchool(selectedSchool.id);
         setSchools(schools.filter((school) => school.id !== selectedSchool.id));
+        setTotalCount((prev) => prev - 1);
         toast.success("Okul başarıyla silindi!");
 
         handleCloseModal();
@@ -256,17 +328,19 @@ const Schools = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <FormField
+                  ref={searchInputRef}
                   type="text"
-                  placeholder="Okul ara..."
+                  placeholder="Okul ara... (Enter'a basın)"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={handleSearchChange}
+                  onKeyDown={handleSearchSubmit}
                   icon="search"
                   delay={0}
                 />
               </div>
               <div className="flex items-center justify-end">
                 <span className="text-sm bg-blue-50 text-blue-600 py-2 px-4 rounded-lg font-medium">
-                  Toplam {filteredSchools.length} okul listeleniyor
+                  Toplam {totalCount} okul
                 </span>
               </div>
             </div>
@@ -274,116 +348,14 @@ const Schools = () => {
         </div>
 
         {/* Okul Kartları */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <AnimatePresence>
-            {filteredSchools.map((school) => (
-              <motion.div
-                key={school.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-150 p-6 border border-gray-100 relative group hover:-translate-y-1 flex flex-col h-full"
-              >
-                <div className="flex-1">
-                  <div className="flex justify-between items-start mb-6">
-                    <h3 className="text-lg font-semibold text-gray-800 leading-tight line-clamp-2">
-                      {school.okulAdi}
-                    </h3>
-                    <span
-                      className={`px-3 py-1.5 text-xs font-medium rounded-full flex-shrink-0 ml-2 ${
-                        school.okulTuru === "devlet"
-                          ? "bg-blue-50 text-blue-600"
-                          : "bg-purple-50 text-purple-600"
-                      }`}
-                    >
-                      {school.okulTuru === "devlet" ? "Devlet" : "Özel"}
-                    </span>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center text-gray-600">
-                      <FiUsers className="mr-3 flex-shrink-0 text-blue-500" />
-                      <span className="font-medium truncate">
-                        {school.ogrenciSayisi} Öğrenci
-                      </span>
-                    </div>
-
-                    <div className="flex items-center text-gray-600">
-                      <FiMapPin className="mr-3 flex-shrink-0 text-blue-500" />
-                      <span className="truncate">
-                        {school.il} / {school.ilce}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center text-gray-600">
-                      <FiPhone className="mr-3 flex-shrink-0 text-blue-500" />
-                      <span className="truncate">{school.telefon}</span>
-                    </div>
-
-                    <div className="flex items-center text-gray-600">
-                      <FiMail className="mr-3 flex-shrink-0 text-blue-500" />
-                      <span className="truncate">{school.eposta}</span>
-                    </div>
-
-                    <div className="flex items-center text-gray-600">
-                      <FiCalendar className="mr-3 flex-shrink-0 text-blue-500" />
-                      <span className="truncate">
-                        {school.okulSistemKayitTarihi}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
-                  <span
-                    className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ${
-                      school.durum === "aktif"
-                        ? "bg-green-50 text-green-600"
-                        : "bg-red-50 text-red-600"
-                    }`}
-                  >
-                    <span
-                      className={`w-2 h-2 rounded-full mr-2 ${
-                        school.durum === "aktif" ? "bg-green-500" : "bg-red-500"
-                      }`}
-                    ></span>
-                    {school.durum === "aktif" ? "Aktif" : "Pasif"}
-                  </span>
-
-                  <button
-                    className="opacity-0 group-hover:opacity-100 transition-all duration-150 inline-flex items-center text-sm font-medium cursor-pointer text-blue-600 hover:text-blue-700"
-                    onClick={() => handleOpenModal(school)}
-                  >
-                    Detaylar
-                    <FiChevronRight className="ml-1" />
-                  </button>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-
-        {/* Yükleniyor ve Sonuç Bulunamadı */}
-        <div className="mt-6">
-          {hasMore && !searchTerm ? (
-            <div ref={loadingRef} className="py-4">
-              <Loader className="h-24" />
-            </div>
-          ) : filteredSchools.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="text-center py-16"
-            >
-              <div className="text-gray-400 text-lg">
-                Arama kriterine uygun okul bulunamadı
-              </div>
-            </motion.div>
-          ) : null}
-        </div>
+        <SchoolsList
+          schools={schools}
+          onSchoolClick={handleOpenModal}
+          loading={loading}
+          hasMore={hasMore}
+          searchTerm={searchTerm}
+          loadingRef={loadingRef}
+        />
 
         {/* School Details Modal */}
         <AnimatePresence>
@@ -418,7 +390,13 @@ const Schools = () => {
                         Okul Detayları
                       </h3>
                       <div className="text-xs opacity-80">
-                        ID: {editedSchool?.id?.slice(0, 8) || ""}
+                        ID:{" "}
+                        {editedSchool?.id
+                          ? String(editedSchool.id).slice(0, 8)
+                          : ""}
+                      </div>
+                      <div className="text-xs opacity-80 mt-1">
+                        Kayıt: {tarihFormatla(editedSchool?.created_at)}
                       </div>
                     </div>
                     <button
@@ -434,9 +412,9 @@ const Schools = () => {
                   <div className="px-8 py-10 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-7 bg-white/95">
                     <FormField
                       label="Okul Adı"
-                      value={editedSchool?.okulAdi || ""}
+                      value={editedSchool?.okul_adi || ""}
                       onChange={(e) =>
-                        handleInputChange("okulAdi", e.target.value)
+                        handleInputChange("okul_adi", e.target.value)
                       }
                     />
                     <CustomDropdown
@@ -445,9 +423,9 @@ const Schools = () => {
                         { value: "devlet", label: "Devlet Okulu" },
                         { value: "özel", label: "Özel Okul" },
                       ]}
-                      value={editedSchool?.okulTuru || ""}
+                      value={editedSchool?.okul_turu || ""}
                       onChange={(e) =>
-                        handleInputChange("okulTuru", e.target.value)
+                        handleInputChange("okul_turu", e.target.value)
                       }
                     />
                     <FormField
@@ -497,26 +475,59 @@ const Schools = () => {
                     />
                     <FormField
                       label="Öğrenci Sayısı"
-                      value={editedSchool?.ogrenciSayisi || ""}
+                      value={editedSchool?.ogrenci_sayisi || ""}
                       onChange={(e) =>
-                        handleInputChange("ogrenciSayisi", e.target.value)
+                        handleInputChange("ogrenci_sayisi", e.target.value)
                       }
                     />
                     <FormField
                       label="Yetkili Kişi"
-                      value={editedSchool?.gorusulecekYetkili || ""}
+                      value={editedSchool?.gorusulecek_yetkili || ""}
                       onChange={(e) =>
-                        handleInputChange("gorusulecekYetkili", e.target.value)
+                        handleInputChange("gorusulecek_yetkili", e.target.value)
                       }
                     />
                     <FormField
                       label="Yetkili Telefon"
                       type="tel"
-                      value={editedSchool?.yetkiliTelefon || ""}
+                      value={editedSchool?.yetkili_telefon || ""}
                       onChange={(e) =>
-                        handleInputChange("yetkiliTelefon", e.target.value)
+                        handleInputChange("yetkili_telefon", e.target.value)
                       }
                     />
+                    <FormField
+                      label="Kredi"
+                      value={
+                        schoolCredit
+                          ? `${schoolCredit.kredi_miktari} kredi`
+                          : "Kredi yok"
+                      }
+                      readOnly
+                    />
+                    <FormField
+                      label="Kullanıcı Adı"
+                      value={editedSchool?.kullanici_adi || ""}
+                      onChange={(e) =>
+                        handleInputChange("kullanici_adi", e.target.value)
+                      }
+                    />
+                    <div className="relative">
+                      <FormField
+                        label="Şifre"
+                        type={showPassword ? "text" : "password"}
+                        value={editedSchool?.sifre || ""}
+                        onChange={(e) =>
+                          handleInputChange("sifre", e.target.value)
+                        }
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-0 -bottom-6 cursor-pointer text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        {showPassword ? "Gizle" : "Göster"}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Modal Footer */}
