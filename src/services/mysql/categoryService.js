@@ -1,5 +1,30 @@
 const API_BASE_URL = "http://localhost/OkulQuiz/backend/api";
 
+export const uploadFile = async (file, type, categoryId = 'temp') => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+    formData.append('categoryId', categoryId);
+
+    const response = await fetch(`${API_BASE_URL}/upload.php`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Dosya yüklenirken hata oluştu');
+    }
+
+    return result.data;
+  } catch (error) {
+    console.error('Dosya upload hatası:', error);
+    throw error;
+  }
+};
+
 // Kategori ekleme
 export const addCategory = async (categoryData) => {
   try {
@@ -83,7 +108,14 @@ export const getCategoriesPaginated = async (
       throw new Error(result.message || "Kategoriler getirilirken hata oluştu");
     }
 
-    return result;
+    // Normalize: backend data sarmalını düzleştir
+    const data = result?.data || result;
+    return {
+      categories: data?.categories || [],
+      lastDoc: data?.pagination?.current_page || null,
+      hasMore: data?.pagination?.has_more || false,
+      totalCount: data?.pagination?.total_count || 0,
+    };
   } catch (error) {
     console.error("Kategoriler getirme hatası:", error);
     throw error;
@@ -284,9 +316,38 @@ export const getQuestionCountByCategoryName = async (categoryName) => {
       );
     }
 
-    return result.question_count || 0;
+    const data = result?.data || result;
+    return data?.question_count || 0;
   } catch (error) {
     console.error("Kategori soru sayısı getirme hatası:", error);
+    return 0;
+  }
+};
+
+// Kategori ID'sine göre soru sayısını getirme (performans için tercih edilir)
+export const getQuestionCountByCategoryId = async (categoryId) => {
+  try {
+    const params = new URLSearchParams({ category_id: String(categoryId) });
+
+    const response = await fetch(`${API_BASE_URL}/categories.php?${params}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        result.message || "Kategori soru sayısı getirilirken hata oluştu"
+      );
+    }
+
+    const data = result?.data || result;
+    return data?.question_count || 0;
+  } catch (error) {
+    console.error("Kategori (ID) soru sayısı getirme hatası:", error);
     return 0;
   }
 };

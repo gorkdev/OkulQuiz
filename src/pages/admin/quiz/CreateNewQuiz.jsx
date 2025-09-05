@@ -25,24 +25,21 @@ import { toast } from "react-toastify";
 const CATEGORY_PANEL_WIDTH = "w-96";
 
 const CategoryQuestions = ({
-  kategori_adi,
+  categoryId,
   selectedQuestions,
   onSelect,
   search,
   setSearch,
 }) => {
-  // Sonsuz scroll ile soruları çek
+  // Sayfalı olarak soruları çek (MySQL)
   const fetchQuestions = async (page, pageSize) => {
-    let lastDocId = null;
-    if (page > 1 && questions.length > 0) {
-      lastDocId = questions[questions.length - 1].id;
-    }
-    const { questions } = await getQuestionsByCategoryPaginated(
-      kategori_adi,
-      pageSize,
-      lastDocId
+    const resp = await getQuestionsByCategoryPaginated(
+      categoryId,
+      page,
+      pageSize
     );
-    return questions;
+    const list = resp?.questions || resp?.data?.questions || [];
+    return list;
   };
   const [questions, setQuestions] = useState([]);
   const [hasMore, setHasMore] = useState(true);
@@ -56,7 +53,7 @@ const CategoryQuestions = ({
     setPage(1);
     setHasMore(true);
     setFirstLoaded(false);
-  }, [kategori_adi, search]);
+  }, [categoryId, search]);
 
   // Soru yükle
   useEffect(() => {
@@ -76,7 +73,7 @@ const CategoryQuestions = ({
       cancelled = true;
     };
     // eslint-disable-next-line
-  }, [page, kategori_adi, search]);
+  }, [page, categoryId, search]);
 
   // Scroll ile yeni sayfa yükle
   const listRef = React.useRef();
@@ -97,8 +94,9 @@ const CategoryQuestions = ({
   // Arama filtrelemesi
   const filteredQuestions = useMemo(() => {
     if (!search) return questions;
+    const term = search.toLowerCase();
     return questions.filter((q) =>
-      (q.soruMetni || "").toLowerCase().includes(search.toLowerCase())
+      (q.soruMetni || q.soru_metni || "").toLowerCase().includes(term)
     );
   }, [questions, search]);
 
@@ -144,8 +142,14 @@ const CategoryQuestions = ({
                   hard: "zor",
                 };
                 const zorluk = zorlukMap[q.zorluk] || q.zorluk || "-";
-                const puan = q.puan ? `${q.puan} puan` : "- puan";
-                const sure = q.sure ? `${q.sure} sn` : "- sn";
+                const puan =
+                  q.puan ?? q.puan_degeri
+                    ? `${q.puan ?? q.puan_degeri} puan`
+                    : "- puan";
+                const sure =
+                  q.sure ?? q.sure_saniye
+                    ? `${q.sure ?? q.sure_saniye} sn`
+                    : "- sn";
                 return (
                   <motion.div
                     key={q.id}
@@ -174,9 +178,9 @@ const CategoryQuestions = ({
                     <div className="flex flex-col flex-1 justify-center py-3 pr-6 min-w-0">
                       <span
                         className="font-semibold text-gray-900 text-base md:text-lg leading-tight w-full text-ellipsis overflow-hidden whitespace-nowrap min-w-0"
-                        title={q.soruMetni}
+                        title={q.soruMetni || q.soru_metni}
                       >
-                        {q.soruMetni}
+                        {q.soruMetni || q.soru_metni}
                       </span>
                       <span className="text-xs text-gray-500 mt-1">
                         {zorluk} • {puan} • {sure}
@@ -329,7 +333,7 @@ const CategoryDndContainer = ({
                 key={q.id}
                 id={q.id}
                 index={idx}
-                text={q.soruMetni}
+                text={q.soruMetni || q.soru_metni}
                 moveCard={moveQuestion}
                 categoryId={id}
               />
@@ -361,8 +365,9 @@ const CreateNewQuiz = () => {
   useEffect(() => {
     async function fetchCategories() {
       setCategoriesLoading(true);
-      const { categories } = await getCategoriesPaginated(100);
-      setCategories(categories);
+      const res = await getCategoriesPaginated(1, 100);
+      const list = res?.data?.categories || res?.categories || [];
+      setCategories(Array.isArray(list) ? list : []);
       setCategoriesLoading(false);
     }
     fetchCategories();
@@ -547,7 +552,7 @@ const CreateNewQuiz = () => {
                       <AnimatePresence initial={false}>
                         {isOpen && (
                           <CategoryQuestions
-                            kategori_adi={cat.kategori_adi}
+                            categoryId={cat.id}
                             selectedQuestions={
                               selectedQuestionsByCategory[cat.id] || []
                             }

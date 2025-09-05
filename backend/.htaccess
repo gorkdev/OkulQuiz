@@ -1,0 +1,25 @@
+# PHP upload ve yürütme limitleri (lokal geliştirme için)
+# Not: Sunucunuzda .htaccess üzerinden php_value ayarları kapalıysa bu dosya etkisiz olabilir.
+
+# Maksimum yükleme boyutu
+php_value upload_max_filesize 64M
+php_value post_max_size 64M
+php_value max_file_uploads 50
+
+# Bellek ve zaman limitleri
+php_value memory_limit 256M
+php_value max_execution_time 300
+php_value max_input_time 300
+
+# Dosya yüklemeleri açık olsun
+php_value file_uploads On
+
+# UTF-8 varsayılan karakter seti
+AddDefaultCharset utf-8
+
+# CORS (ihtiyaç halinde)
+<IfModule mod_headers.c>
+  Header set Access-Control-Allow-Origin "*"
+  Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  Header set Access-Control-Allow-Headers "Content-Type, Authorization"
+</IfModule>

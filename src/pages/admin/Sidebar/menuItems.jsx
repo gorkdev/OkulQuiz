@@ -68,22 +68,7 @@ export const menuItems = [
       },
     ],
   },
-  {
-    name: "Quizler",
-    icon: <PiExam size={20} />,
-    submenu: [
-      {
-        name: "Tüm Quizler",
-        to: "/admin/quizler",
-        icon: <CiBoxList size={18} />,
-      },
-      {
-        name: "Yeni Quiz Ekle",
-        to: "/admin/quizler/ekle",
-        icon: <IoIosAddCircleOutline size={18} />,
-      },
-    ],
-  },
+
   {
     name: "Kategoriler",
     icon: <BiCategory size={20} />,
@@ -100,6 +85,7 @@ export const menuItems = [
       },
     ],
   },
+
   {
     name: "Sorular",
     icon: <LiaQuestionSolid size={20} />,
@@ -112,6 +98,23 @@ export const menuItems = [
       {
         name: "Yeni Soru Ekle",
         to: "/admin/sorular/ekle",
+        icon: <IoIosAddCircleOutline size={18} />,
+      },
+    ],
+  },
+
+  {
+    name: "Quizler",
+    icon: <PiExam size={20} />,
+    submenu: [
+      {
+        name: "Tüm Quizler",
+        to: "/admin/quizler",
+        icon: <CiBoxList size={18} />,
+      },
+      {
+        name: "Yeni Quiz Ekle",
+        to: "/admin/quizler/ekle",
         icon: <IoIosAddCircleOutline size={18} />,
       },
     ],

@@ -7,6 +7,10 @@
 - Kod yazarken mevcut yapıyı bozma.
 - Kodun düzenli, okunabilir ve sürdürülebilir olmasına dikkat et.
 - Gereksiz yorum, açıklama veya ek kod yazma.
+- Türkçe konuş.
+- Yapacağın her front-end tasarımını, sitemin genel tasarımına uygun olarak yap.
+- Oluşturacağın modallarda eğer projede yüklüyse framer-motion kullan ve açılış/kapanış animasyonları ekle. Eğer yüklü değilse kullanma.
+- Veritabanında tablo kontrolü yapacağın zaman, cmd ile mysql komutunu kullanabilirsin şifre  boş.
 
 ## Frontend Kuralları (React)
 

@@ -58,7 +58,13 @@ export const getQuestionsPaginated = async (
       throw new Error(result.message || "Sorular getirilirken hata oluştu");
     }
 
-    return result;
+    // Frontend'in beklediği formata dönüştür
+    return {
+      questions: result.data?.questions || result.questions || [],
+      lastDoc: result.data?.pagination?.current_page || null,
+      hasMore: result.data?.pagination?.has_more || false,
+      totalCount: result.data?.pagination?.total_count || 0,
+    };
   } catch (error) {
     console.error("Sorular getirme hatası:", error);
     throw error;
@@ -325,6 +331,25 @@ export const uploadQuestionFile = async (file, questionId) => {
     return result;
   } catch (error) {
     console.error("Dosya yükleme hatası:", error);
+    throw error;
+  }
+};
+
+// Multipart ile yeni soru oluşturma (dosya + alanlar)
+export const createQuestionWithFiles = async (formData) => {
+  const API_BASE_URL = "http://localhost/OkulQuiz/backend/api";
+  try {
+    const response = await fetch(`${API_BASE_URL}/questions.php`, {
+      method: "POST",
+      body: formData,
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || "Soru eklenirken hata oluştu");
+    }
+    return result;
+  } catch (error) {
+    console.error("Soru ekleme (multipart) hatası:", error);
     throw error;
   }
 };

@@ -31,7 +31,8 @@ const AddNewQuestion = () => {
       setLoading(true);
       try {
         const result = await getCategoriesPaginated(1, 50);
-        setCategories(result.categories || []);
+        const list = result?.data?.categories || result?.categories || [];
+        setCategories(Array.isArray(list) ? list : []);
       } catch (e) {
         console.error("Kategoriler yüklenirken hata:", e);
         setCategories([]);

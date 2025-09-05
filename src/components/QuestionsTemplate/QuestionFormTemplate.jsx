@@ -5,16 +5,16 @@ import FormField from "../FormTemplate/FormField";
 import CustomDropdown from "../FormTemplate/CustomDropdown";
 import CustomRadio from "../FormTemplate/CustomRadio";
 import CustomCheckbox from "../FormTemplate/CustomCheckbox";
-import { createQuestion } from "../../services/mysql/questionService";
+import { createQuestionWithFiles } from "../../services/mysql/questionService";
 import { toast } from "react-toastify";
 // Benzersiz id üretici
 const generateOptionId = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2);
 
 const difficultyOptions = [
-  { value: "easy", label: "Kolay" },
-  { value: "medium", label: "Orta" },
-  { value: "hard", label: "Zor" },
+  { value: "kolay", label: "Kolay" },
+  { value: "orta", label: "Orta" },
+  { value: "zor", label: "Zor" },
 ];
 
 const QuestionFormTemplate = ({ selectedCategory }) => {
@@ -33,7 +33,7 @@ const QuestionFormTemplate = ({ selectedCategory }) => {
     ],
     correctAnswerCount: 1,
     correctAnswers: [0],
-    difficulty: "easy",
+    difficulty: "kolay",
     duration: 30,
     score: 10,
     hasDuration: true,
@@ -252,43 +252,83 @@ const QuestionFormTemplate = ({ selectedCategory }) => {
       );
       return;
     }
-    // Türkçe alan isimleriyle, Türkçe karakter içermeyen şekilde veri oluştur
-    const questionData = {
-      soruMetniVar: hasQuestionText,
-      soruMetni: hasQuestionText ? questionText : "",
-      soruGorseliVar: hasQuestionImage,
-      soruSesiVar: hasQuestionAudio,
-      soruSesi: questionAudio,
-      gorselVar: hasQuestionImage,
-      gorselSayisi: hasQuestionImage ? imageCount : 0,
-      gorseller: hasQuestionImage ? images : [],
-      sikSayisi: optionCount,
-      siklar: options,
-      dogruCevapSayisi: correctAnswerCount,
-      dogruCevaplar: correctAnswers,
-      zorluk: difficulty,
-      sure: duration,
-      puan: score,
-      sureVar: hasDuration,
-      puanVar: hasScore,
-      soruZorunlu: isQuestionRequired,
-      geriBildirimVar: hasFeedback,
-      geriBildirim: feedback,
-      ipucuVar: hasHint,
-      ipucu: hint,
-      siraliSiklar: isOrderableOptions,
-      hedefYas: ageCategory,
-      siklariKaristir: shuffleOptions,
-      kategori: selectedCategory
-        ? {
-            id: selectedCategory.id,
-            kategoriAdi: selectedCategory.kategoriAdi,
-            aciklama: selectedCategory.aciklama || "",
-            durum: selectedCategory.durum,
-          }
-        : null,
-    };
-    createQuestion(questionData)
+    // Backend (PHP) beklenen payload'a dönüştür
+    const letterMap = ["A", "B", "C", "D"];
+    const limitedOptions = options.slice(0, 4);
+    if (limitedOptions.length < 2) {
+      setLoading(false);
+      toast.error("En az 2 şık gerekli (A ve B)!");
+      return;
+    }
+
+    const secenekA = limitedOptions[0]?.text || "";
+    const secenekB = limitedOptions[1]?.text || "";
+    const secenekC = limitedOptions[2]?.text || "";
+    const secenekD = limitedOptions[3]?.text || "";
+
+    if (!selectedCategory?.id) {
+      setLoading(false);
+      toast.error("Lütfen bir kategori seçin.");
+      return;
+    }
+
+    const dogruIdx = correctAnswers[0];
+    const dogruCevap = letterMap[dogruIdx] || null;
+    if (!dogruCevap) {
+      setLoading(false);
+      toast.error("Lütfen bir doğru cevap işaretleyin.");
+      return;
+    }
+
+    // FormData ile multipart gönderim
+    const fd = new FormData();
+    fd.append("kategori_id", String(selectedCategory.id));
+    fd.append("soru_metni", hasQuestionText ? questionText : "");
+    fd.append("zorluk", difficulty || "orta");
+    // Checkbox/ayarlar
+    fd.append("sure_var", String(hasDuration ? 1 : 0));
+    if (hasDuration) fd.append("sure_saniye", String(duration));
+    fd.append("puan_var", String(hasScore ? 1 : 0));
+    if (hasScore) fd.append("puan_degeri", String(score));
+    fd.append("soru_zorunlu", String(isQuestionRequired ? 1 : 0));
+    fd.append("soru_metni_var", String(hasQuestionText ? 1 : 0));
+    fd.append("soru_gorseli_var", String(hasQuestionImage ? 1 : 0));
+    fd.append("soru_sesi_var", String(hasQuestionAudio ? 1 : 0));
+    fd.append("geri_bildirim_var", String(hasFeedback ? 1 : 0));
+    if (hasFeedback && feedback) fd.append("aciklama", feedback);
+    fd.append("ipucu_var", String(hasHint ? 1 : 0));
+    if (hasHint && hint) fd.append("ipucu", hint);
+    fd.append("sirali_siklar", String(isOrderableOptions ? 1 : 0));
+    fd.append("siklari_karistir", String(shuffleOptions ? 1 : 0));
+    if (ageCategory && ageCategory !== "tum-yaslar")
+      fd.append("hedef_yas", String(ageCategory));
+    fd.append("durum", "aktif");
+
+    // Soru medya dosyaları
+    if (hasQuestionImage) {
+      const firstImage = images?.[0]?.file || null;
+      if (firstImage) fd.append("soru_resim", firstImage);
+    }
+    if (hasQuestionAudio && questionAudio) {
+      fd.append("soru_ses", questionAudio);
+    }
+
+    // Şıklar: metinler ve medya (separator backend: '||')
+    const optionTexts = options.map((o) => (o.text || "").trim());
+    optionTexts.forEach((t) => fd.append("secenekler_metin[]", t));
+    // Doğru indexler
+    const correctIdxs = correctAnswers.map((i) => i);
+    correctIdxs.forEach((i) => fd.append("dogru_indeksler[]", String(i)));
+    // Şık görselleri
+    options.forEach((o) => {
+      if (o.image) fd.append("secenekler_resim[]", o.image);
+    });
+    // Şık sesleri
+    options.forEach((o) => {
+      if (o.audio) fd.append("secenekler_ses[]", o.audio);
+    });
+
+    createQuestionWithFiles(fd)
       .then((id) => {
         setSuccess(true);
         setLoading(false);
@@ -504,10 +544,10 @@ const QuestionFormTemplate = ({ selectedCategory }) => {
               Soru Sesi
             </span>
             <FormField
-              label="Soru Sesi (*.mp3)"
+              label="Soru Sesi"
               name="questionAudio"
               type="file"
-              accept="audio/mp3,audio/mpeg"
+              accept="audio/*"
               required
               onChange={(e) => setQuestionAudio(e.target.files[0])}
             />
@@ -693,7 +733,7 @@ const QuestionFormTemplate = ({ selectedCategory }) => {
                                     label="Ses (Opsiyonel)"
                                     name={`option_audio_${idx}`}
                                     type="file"
-                                    accept="audio/mp3,audio/mpeg"
+                                    accept="audio/*"
                                     onChange={(e) => {
                                       const file = e.target.files[0];
                                       setOptions((prev) => {

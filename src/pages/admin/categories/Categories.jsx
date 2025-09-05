@@ -1,77 +1,127 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import AdminHeader from "@/components/AdminHeader/AdminHeader";
-import {
-  getCategoriesPaginated,
-  updateCategory,
-  deleteCategory,
-  setCategoryActive,
-  setCategoryPassive,
-} from "@/services/mysql/categoryService";
-import { toast } from "react-toastify";
-import { FiChevronRight, FiX, FiTrash2, FiSave, FiTag } from "react-icons/fi";
-import { GoCheck } from "react-icons/go";
-import { CiPause1 } from "react-icons/ci";
 import { motion, AnimatePresence } from "framer-motion";
-import FormField from "@/components/FormTemplate/FormField";
-import CustomDropdown from "@/components/FormTemplate/CustomDropdown";
-import Loader from "@/components/Loader";
-import { getQuestionCountByCategoryName } from "@/services/mysql/categoryService";
+import { FiChevronRight, FiTag } from "react-icons/fi";
+import {
+  getAllCategoriesPaginated,
+  updateCategory,
+  getQuestionCountByCategoryId,
+} from "@/services/mysql/categoryService";
 import KategoriFormu from "./KategoriFormu";
-import KategoriDetayFormu from "./KategoriDetayFormu";
+import { toast } from "react-toastify";
+import FormField from "@/components/FormTemplate/FormField";
+import Loader from "@/components/Loader";
+import { tarihFormatla } from "../../../hooks/tarihFormatla";
+import sayiFormatla from "../../../hooks/sayiFormatla";
 
-const statusOptions = [
-  { value: "aktif", label: "Aktif" },
-  { value: "pasif", label: "Pasif" },
-];
+const PAGE_SIZE = 12;
 
 const Categories = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editedCategory, setEditedCategory] = useState(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [lastDocId, setLastDocId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
   const loadingRef = useRef(null);
   const observer = useRef(null);
-  const [categoryQuestionCounts, setCategoryQuestionCounts] = useState({});
-  const [editMode, setEditMode] = useState(false);
 
-  // MySQL backend'den gelen veriler için normalizeString fonksiyonu
-  const normalizeString = (str) => {
-    return String(str)
-      .toLocaleLowerCase("tr-TR")
-      .replace(/ı/g, "i")
-      .replace(/İ/g, "i");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [questionCounts, setQuestionCounts] = useState({});
+
+  const mapCategoryToForm = useCallback((cat) => {
+    if (!cat) return null;
+    return {
+      id: cat.id,
+      kategoriAdi: cat.kategoriAdi || cat.kategori_adi || "",
+      aciklama: cat.aciklama || "",
+      durum: cat.durum || "aktif",
+      createdAt: cat.createdAt || cat.created_at || null,
+      // Yeni alanlar
+      kategoriBaslarkenMetin: cat.kategori_baslarken_metin || false,
+      kategoriBaslarkenSes: cat.kategori_baslarken_ses || false,
+      kategoriBaslarkenResim: cat.kategori_baslarken_resim || false,
+      kategoriBaslarkenSlider: cat.kategori_baslarken_slider || false,
+      kategoriBaslarkenGeriyeSayim:
+        cat.kategori_baslarken_geriye_sayim || false,
+      sesOtomatikOynatilsin: cat.ses_otomatik_oynatilsin || false,
+      preText: cat.pre_text || "",
+      preAudio: cat.pre_audio_url || null,
+      preImage: cat.pre_image_url || null,
+      sliderImages: cat.slider_images ? JSON.parse(cat.slider_images) : [],
+      countdownSeconds: cat.countdown_seconds || 3,
+    };
+  }, []);
+
+  const getCategoryName = (cat) =>
+    (cat && (cat.kategoriAdi || cat.kategori_adi)) || "(İsimsiz)";
+  const getCreatedAt = (cat) =>
+    (cat && (cat.createdAt || cat.created_at)) || null;
+
+  const extractPaged = (res) => {
+    const data = res?.data || res;
+    return {
+      categories: data?.categories || [],
+      hasMore: data?.pagination?.has_more || false,
+      totalCount: data?.pagination?.total_count || 0,
+    };
   };
 
-  // Veri yükleme fonksiyonu
-  const loadMoreCategories = useCallback(async () => {
-    if (isLoadingMore || !hasMore) return;
+  const fetchCategories = useCallback(
+    async (search = searchTerm) => {
+      try {
+        setLoading(true);
+        if (!search.trim()) {
+          const result = await getAllCategoriesPaginated(1, PAGE_SIZE);
+          const { categories, hasMore, totalCount } = extractPaged(result);
+          setCategories(categories);
+          setCurrentPage(1);
+          setHasMore(hasMore);
+          setTotalCount(totalCount);
+          // Soru sayıları
+          fetchQuestionCounts(categories);
+        } else {
+          const result = await getAllCategoriesPaginated(1, 50, search);
+          const { categories, totalCount } = extractPaged(result);
+          setCategories(categories);
+          setCurrentPage(1);
+          setHasMore(false);
+          setTotalCount(totalCount);
+          fetchQuestionCounts(categories);
+        }
+      } catch (error) {
+        toast.error("Kategoriler yüklenirken bir hata oluştu!");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [searchTerm]
+  );
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore || searchTerm.trim()) return;
     try {
       setIsLoadingMore(true);
-      const nextPage = lastDocId ? lastDocId + 1 : 2;
-      const result = await getCategoriesPaginated(nextPage, 6);
-      if (result.categories.length > 0) {
-        setCategories((prev) => [...prev, ...result.categories]);
-        setLastDocId(result.lastDoc);
-        setHasMore(result.hasMore);
-        // Yeni yüklenen kategoriler için soru sayısı yükle
-        const counts = { ...categoryQuestionCounts };
-        await Promise.all(
-          result.categories.map(async (cat) => {
-            if (!(cat.kategori_adi in counts)) {
-              const count = await getQuestionCountByCategoryName(
-                cat.kategori_adi
-              );
-              counts[cat.kategori_adi] = count;
-            }
-          })
-        );
-        setCategoryQuestionCounts(counts);
+      const nextPage = currentPage + 1;
+      const result = await getAllCategoriesPaginated(nextPage, PAGE_SIZE);
+      const { categories, hasMore: more } = extractPaged(result);
+      if (categories.length > 0) {
+        setCategories((prev) => [...prev, ...categories]);
+        setCurrentPage(nextPage);
+        setHasMore(more);
+        fetchQuestionCounts(categories);
       } else {
         setHasMore(false);
       }
@@ -80,75 +130,28 @@ const Categories = () => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [lastDocId, hasMore, isLoadingMore, categoryQuestionCounts]);
+  }, [currentPage, hasMore, isLoadingMore, searchTerm]);
 
-  // İlk yükleme ve arama işlemleri
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        setLoading(true);
+  const fetchQuestionCounts = useCallback(async (cats) => {
+    try {
+      const entries = await Promise.all(
+        (cats || []).map(async (c) => {
+          const cid = c.id;
+          if (!cid) return [c.id, 0];
+          const count = await getQuestionCountByCategoryId(cid);
+          return [c.id, Number(count) || 0];
+        })
+      );
+      setQuestionCounts((prev) => ({
+        ...prev,
+        ...Object.fromEntries(entries),
+      }));
+    } catch {}
+  }, []);
 
-        if (!searchTerm.trim()) {
-          // Arama yoksa normal pagination ile yükle
-          const result = await getCategoriesPaginated(1, 6);
-          setCategories(result.categories);
-          setLastDocId(result.lastDoc);
-          setHasMore(result.hasMore);
-          // Soru sayıları da yükleniyor
-          const counts = {};
-          await Promise.all(
-            result.categories.map(async (cat) => {
-              const count = await getQuestionCountByCategoryName(
-                cat.kategori_adi
-              );
-              counts[cat.kategori_adi] = count;
-            })
-          );
-          setCategoryQuestionCounts(counts);
-        } else {
-          // Arama varsa backend'den arama sonuçlarını getir
-          const result = await getCategoriesPaginated(1, 50, searchTerm);
-          setCategories(result.categories);
-          setLastDocId(result.lastDoc);
-          setHasMore(false); // Arama sonuçlarında pagination yok
-          // Soru sayıları da yükleniyor
-          const counts = {};
-          await Promise.all(
-            result.categories.map(async (cat) => {
-              const count = await getQuestionCountByCategoryName(
-                cat.kategori_adi
-              );
-              counts[cat.kategori_adi] = count;
-            })
-          );
-          setCategoryQuestionCounts(counts);
-        }
-      } catch (error) {
-        toast.error("Kategoriler yüklenirken bir hata oluştu!");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // Debounce ile arama
-    const timeoutId = setTimeout(
-      () => {
-        fetchCategories();
-      },
-      searchTerm ? 500 : 0
-    );
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
-
-  // Intersection Observer kurulumu
   useEffect(() => {
     if (loading) return;
-    const options = {
-      root: null,
-      rootMargin: "20px",
-      threshold: 0.1,
-    };
+    const options = { root: null, rootMargin: "20px", threshold: 0.1 };
     observer.current = new IntersectionObserver((entries) => {
       if (
         entries[0].isIntersecting &&
@@ -156,125 +159,50 @@ const Categories = () => {
         !isLoadingMore &&
         !searchTerm.trim()
       ) {
-        loadMoreCategories();
+        loadMore();
       }
     }, options);
     if (loadingRef.current) {
       observer.current.observe(loadingRef.current);
     }
     return () => {
-      if (observer.current) {
-        observer.current.disconnect();
-      }
+      if (observer.current) observer.current.disconnect();
     };
-  }, [loading, hasMore, isLoadingMore, loadMoreCategories, searchTerm]);
+  }, [loading, hasMore, isLoadingMore, loadMore, searchTerm]);
 
-  // Arama yapıldığında scroll'u sıfırla
-  useEffect(() => {
-    if (searchTerm) {
-      window.scrollTo(0, 0);
-    }
-  }, [searchTerm]);
-
-  useEffect(() => {
-    if (isModalOpen) {
-      const original = document.body.style.overflowY;
-      document.body.style.overflowY = "hidden";
-      return () => {
-        document.body.style.overflowY = original;
-      };
-    }
-  }, [isModalOpen]);
-
-  const handleOpenModal = (cat) => {
-    setSelectedCategory(cat);
-    setEditedCategory(cat);
+  const handleCardClick = (category) => {
+    setSelectedCategory(category);
     setIsModalOpen(true);
-    setEditMode(false);
   };
 
-  const handleCloseModal = () => {
-    setSelectedCategory(null);
-    setEditedCategory(null);
+  const handleModalClose = () => {
     setIsModalOpen(false);
+    setSelectedCategory(null);
   };
 
-  const handleInputChange = (field, value) => {
-    setEditedCategory((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const handleSave = async () => {
+  const handleUpdate = async (data) => {
+    if (!selectedCategory?.id) return;
     try {
-      setIsSaving(true);
-      await updateCategory(editedCategory.id, editedCategory);
-      setCategories(
-        categories.map((cat) =>
-          cat.id === editedCategory.id ? editedCategory : cat
-        )
-      );
+      await updateCategory(selectedCategory.id, data);
       toast.success("Kategori başarıyla güncellendi!");
-      handleCloseModal();
+
+      // Güncelleme sonrası yeni verileri çek
+      await fetchCategories();
+
+      handleModalClose();
     } catch (error) {
-      toast.error("Kategori güncellenirken bir hata oluştu!");
-    } finally {
-      setIsSaving(false);
+      // Backend'ten gelen hata mesajını göster
+      console.error("Güncelleme hatası:", error);
+      const errorMessage =
+        error?.message || "Güncelleme sırasında bir hata oluştu";
+      toast.error(errorMessage);
+
+      // Hata sonrası modal'ı kapat
+      handleModalClose();
     }
   };
 
-  const handleDelete = async () => {
-    if (window.confirm("Bu kategoriyi silmek istediğinizden emin misiniz?")) {
-      try {
-        setIsSaving(true);
-        await deleteCategory(selectedCategory.id);
-        setCategories(
-          categories.filter((cat) => cat.id !== selectedCategory.id)
-        );
-        toast.success("Kategori başarıyla silindi!");
-        handleCloseModal();
-      } catch (error) {
-        toast.error("Kategori silinirken bir hata oluştu!");
-      } finally {
-        setIsSaving(false);
-      }
-    }
-  };
-
-  const handleSetPassive = async () => {
-    try {
-      setIsSaving(true);
-      await setCategoryPassive(editedCategory.id);
-      const updated = { ...editedCategory, durum: "pasif" };
-      setCategories(
-        categories.map((cat) => (cat.id === editedCategory.id ? updated : cat))
-      );
-      toast.success("Kategori pasif yapıldı!");
-      setEditedCategory(updated);
-    } catch (error) {
-      toast.error("Kategori pasif yapılırken bir hata oluştu!");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleSetActive = async () => {
-    try {
-      setIsSaving(true);
-      await setCategoryActive(editedCategory.id);
-      const updated = { ...editedCategory, durum: "aktif" };
-      setCategories(
-        categories.map((cat) => (cat.id === editedCategory.id ? updated : cat))
-      );
-      toast.success("Kategori aktif yapıldı!");
-      setEditedCategory(updated);
-    } catch (error) {
-      toast.error("Kategori aktif yapılırken bir hata oluştu!");
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const gridItems = useMemo(() => categories || [], [categories]);
 
   if (loading) {
     return (
@@ -289,7 +217,7 @@ const Categories = () => {
     <>
       <AdminHeader title="Kategoriler" />
       <div className="py-6 max-w-[1400px]">
-        {/* Arama ve İstatistik Bölümü */}
+        {/* Arama ve sayaç */}
         <div className="mb-8">
           <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -305,67 +233,61 @@ const Categories = () => {
               </div>
               <div className="flex items-center justify-end">
                 <span className="text-sm bg-blue-50 text-blue-600 py-2 px-4 rounded-lg font-medium">
-                  Toplam {categories.length} kategori
+                  Toplam {totalCount} kategori
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Kategori Kartları */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Kartlar */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           <AnimatePresence>
-            {categories.map((cat) => (
+            {gridItems.map((cat) => (
               <motion.div
                 key={cat.id}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-150 p-3 border border-gray-100 relative group hover:-translate-y-1 flex flex-col h-full min-h-[120px]"
+                className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-150 p-4 border border-gray-100 relative group hover:-translate-y-1 flex flex-col h-full"
               >
-                <div className="flex-1">
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="text-base font-semibold text-gray-800 leading-tight line-clamp-2 flex items-center gap-2">
-                      <FiTag className="text-blue-500" />
-                      {cat.kategori_adi}
-                    </h3>
-                    <span className="text-xs text-blue-700 font-semibold bg-blue-100 rounded px-2 py-0.5 ml-2 whitespace-nowrap">
-                      {typeof categoryQuestionCounts[cat.kategori_adi] ===
-                      "number"
-                        ? `${categoryQuestionCounts[cat.kategori_adi]} soru`
-                        : "..."}
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {cat.aciklama && (
-                      <div className="flex items-center text-gray-600 text-xs">
-                        <span className="truncate">{cat.aciklama}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <h3 className="text-base font-semibold text-gray-800 leading-tight line-clamp-2">
+                    {getCategoryName(cat)}
+                  </h3>
                   <span
-                    className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                    className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${
                       cat.durum === "aktif"
                         ? "bg-green-50 text-green-600"
                         : "bg-red-50 text-red-600"
                     }`}
                   >
-                    <span
-                      className={`w-2 h-2 rounded-full mr-1 ${
-                        cat.durum === "aktif" ? "bg-green-500" : "bg-red-500"
-                      }`}
-                    ></span>
                     {cat.durum === "aktif" ? "Aktif" : "Pasif"}
                   </span>
+                </div>
+                {cat.aciklama && (
+                  <p className="text-xs text-gray-500 line-clamp-2 mb-3">
+                    {cat.aciklama}
+                  </p>
+                )}
+                <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium text-gray-500 bg-gray-50">
+                      {getCreatedAt(cat)
+                        ? tarihFormatla(getCreatedAt(cat))
+                        : ""}
+                    </span>
+                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium text-blue-600 bg-blue-50">
+                      {sayiFormatla(questionCounts[cat.id] ?? 0)} Soru
+                    </span>
+                  </div>
                   <button
                     className="opacity-0 group-hover:opacity-100 transition-all duration-150 inline-flex items-center text-xs font-medium cursor-pointer text-blue-600 hover:text-blue-700"
-                    onClick={() => handleOpenModal(cat)}
+                    onClick={() => handleCardClick(cat)}
                   >
-                    Detaylar
-                    <FiChevronRight className="ml-1" />
+                    Detay
+                    <FiChevronRight className="ml-1" size={12} />
                   </button>
                 </div>
               </motion.div>
@@ -373,13 +295,13 @@ const Categories = () => {
           </AnimatePresence>
         </div>
 
-        {/* Yükleniyor ve Sonuç Bulunamadı */}
+        {/* Yükleniyor/Hepsi yüklendi */}
         <div className="mt-6">
           {hasMore && !searchTerm.trim() ? (
             <div ref={loadingRef} className="py-4">
               <Loader className="h-24" />
             </div>
-          ) : categories.length === 0 ? (
+          ) : gridItems.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -389,125 +311,66 @@ const Categories = () => {
             >
               <div className="text-gray-400 text-lg">
                 {searchTerm
-                  ? "Arama kriterine uygun kategori bulunamadı"
+                  ? "Arama sonucu bulunamadı"
                   : "Henüz kategori eklenmemiş"}
               </div>
             </motion.div>
           ) : null}
         </div>
-
-        {/* Category Details Modal */}
-        <AnimatePresence>
-          {isModalOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 overflow-y-auto"
-            >
-              <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-                {/* Backdrop */}
-                <div
-                  className="fixed inset-0 bg-black/10 backdrop-blur-[8px]"
-                  onClick={handleCloseModal}
-                />
-                <motion.div
-                  initial={{ scale: 0.97, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.97, opacity: 0 }}
-                  className="relative w-full max-w-4xl mx-auto my-10 bg-white/95 rounded-2xl shadow-2xl p-0 overflow-hidden border border-gray-200 flex flex-col"
-                  style={{ boxShadow: "0 12px 48px 0 rgba(31, 38, 135, 0.18)" }}
-                >
-                  {/* Modal Header */}
-                  <div className="flex items-center gap-4 px-12 py-8 bg-gradient-to-r from-blue-700 via-blue-500 to-blue-400 text-white border-b border-blue-100">
-                    <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-white/20 shadow-md">
-                      <FiTag size={28} />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold tracking-tight leading-tight mb-1">
-                        Kategori Detayları
-                      </h3>
-                      <div className="text-xs opacity-80">
-                        ID: {editedCategory?.id?.slice(0, 8) || ""}
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleCloseModal}
-                      className="ml-auto text-white/80 hover:text-white transition-colors rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-white"
-                      aria-label="Kapat"
-                    >
-                      <FiX size={24} />
-                    </button>
-                  </div>
-                  {/* Modal Content */}
-                  <div className="px-12 py-10 grid grid-cols-1 gap-x-10 gap-y-7 bg-white/95 justify-center">
-                    <div className="mx-auto">
-                      {isModalOpen && !isSaving && !editMode && (
-                        <>
-                          <KategoriDetayFormu initialValues={editedCategory} />
-                          <div className="flex justify-end mt-6">
-                            <button
-                              onClick={() => setEditMode(true)}
-                              className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors"
-                            >
-                              Düzenle
-                            </button>
-                          </div>
-                        </>
-                      )}
-                      {isModalOpen && editMode && (
-                        <KategoriFormu
-                          initialValues={editedCategory}
-                          isEdit={true}
-                          onSubmit={async (updatedData, reset) => {
-                            setIsSaving(true);
-                            await updateCategory(
-                              editedCategory.id,
-                              updatedData
-                            );
-                            setCategories(
-                              categories.map((cat) =>
-                                cat.id === editedCategory.id
-                                  ? { ...editedCategory, ...updatedData }
-                                  : cat
-                              )
-                            );
-                            toast.success("Kategori başarıyla güncellendi!");
-                            handleCloseModal();
-                            setIsSaving(false);
-                            setEditMode(false);
-                          }}
-                        />
-                      )}
-                    </div>
-                  </div>
-                  {/* Modal Footer */}
-                  <div className="flex justify-end gap-4 px-8 pb-8 pt-6 border-t border-gray-100 bg-white/95">
-                    <button
-                      onClick={handleDelete}
-                      disabled={isSaving}
-                      className="cursor-pointer flex items-center px-4 py-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors shadow-sm"
-                    >
-                      <FiTrash2 className="mr-2" />
-                      Kategoriyi Sil
-                    </button>
-                    <button
-                      onClick={handleSave}
-                      disabled={isSaving}
-                      className={`cursor-pointer flex items-center px-6 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-md ${
-                        isSaving ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                    >
-                      <FiSave className="mr-2" />
-                      {isSaving ? "Kaydediliyor..." : "Kaydet"}
-                    </button>
-                  </div>
-                </motion.div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
+
+      {/* Modal */}
+      <AnimatePresence>
+        {isModalOpen && selectedCategory && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 overflow-y-auto"
+          >
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+              <div
+                className="fixed inset-0 bg-black/10 backdrop-blur-[8px]"
+                onClick={handleModalClose}
+              />
+              <motion.div
+                initial={{ scale: 0.97, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.97, opacity: 0 }}
+                className="relative w-full max-w-[800px] mx-auto my-10 bg-white rounded-2xl p-0 overflow-hidden border border-gray-200 flex flex-col"
+              >
+                <div className="flex items-center gap-4 px-6 py-5 bg-gradient-to-r from-blue-700 via-blue-500 to-blue-400 text-white border-b border-blue-100">
+                  <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 shadow-md">
+                    <FiTag size={28} />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold tracking-tight leading-tight mb-1">
+                      Kategori Düzenle
+                    </h3>
+                    <div className="text-xs opacity-80">
+                      {getCategoryName(selectedCategory)}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleModalClose}
+                    className="ml-auto text-white/80 hover:text-white transition-colors rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-white"
+                    aria-label="Kapat"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="px-6 py-6 max-h-[70vh] overflow-y-auto bg-white">
+                  <KategoriFormu
+                    initialValues={mapCategoryToForm(selectedCategory)}
+                    isEdit
+                    onSubmit={handleUpdate}
+                  />
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 };

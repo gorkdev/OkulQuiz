@@ -10,6 +10,8 @@ import { toast } from "react-toastify";
 import {
   addCategory,
   isCategoryNameTaken,
+  uploadFile,
+  updateCategory,
 } from "@/services/mysql/categoryService";
 // Firebase import'ları kaldırıldı - MySQL kullanıyoruz
 
@@ -134,12 +136,15 @@ const KategoriFormu = ({ initialValues, onSubmit: onSubmitProp, isEdit }) => {
     setAutoPlayAudio(e.target.checked);
   };
 
-  // Dosya yükleme yardımcı fonksiyonu - MySQL için basitleştirildi
-  const uploadFileToStorage = async (file, path) => {
+  const uploadFileToStorage = async (file, type, categoryId = "temp") => {
     if (!file) return null;
-    // MySQL için dosya yükleme işlemi basitleştirildi
-    // Gerçek uygulamada dosya upload API'si kullanılmalı
-    return `uploads/${path}/${Date.now()}_${file.name}`;
+    try {
+      const result = await uploadFile(file, type, categoryId);
+      return result.path;
+    } catch (error) {
+      console.error("Dosya upload hatası:", error);
+      throw error;
+    }
   };
 
   const onSubmit = async (data) => {
@@ -153,27 +158,79 @@ const KategoriFormu = ({ initialValues, onSubmit: onSubmitProp, isEdit }) => {
           return;
         }
       }
-      // Dosya upload işlemleri
+      // Dosya yükleme işlemleri
       let sliderImageUrls = [];
-      if (showSlider && sliderFiles.length > 0) {
-        sliderImageUrls = await Promise.all(
-          sliderFiles.map((file) =>
-            file ? uploadFileToStorage(file, `sliderImages`) : null
-          )
-        );
-      }
       let preAudioUrl = null;
-      if (showPreAudio && preAudio) {
-        preAudioUrl = await uploadFileToStorage(preAudio, `categoryAudios`);
-      }
       let preImageUrl = null;
-      if (showPreImage && preImage) {
-        preImageUrl = await uploadFileToStorage(preImage, `categoryImages`);
+
+      if (isEdit) {
+        // Güncelleme modunda: yeni dosya varsa yükle, yoksa eski URL'yi koru
+        if (showSlider) {
+          if (sliderFiles.length > 0) {
+            // Yeni slider dosyaları yükle
+            sliderImageUrls = await Promise.all(
+              sliderFiles.map((file) =>
+                file ? uploadFileToStorage(file, `sliders`, "temp") : null
+              )
+            );
+            sliderImageUrls = sliderImageUrls.filter((url) => url !== null);
+          } else {
+            // Eski slider URL'lerini koru
+            sliderImageUrls = initialValues?.sliderImages || [];
+          }
+        } else {
+          // Slider kapalıysa eski URL'leri koru
+          sliderImageUrls = initialValues?.sliderImages || [];
+        }
+
+        if (showPreAudio) {
+          if (preAudio) {
+            // Yeni ses dosyası yükle
+            preAudioUrl = await uploadFileToStorage(preAudio, `audios`, "temp");
+          } else {
+            // Eski ses URL'ini koru
+            preAudioUrl = initialValues?.preAudio || null;
+          }
+        } else {
+          // Ses kapalıysa eski URL'yi koru
+          preAudioUrl = initialValues?.preAudio || null;
+        }
+
+        if (showPreImage) {
+          if (preImage) {
+            // Yeni resim dosyası yükle
+            preImageUrl = await uploadFileToStorage(preImage, `images`, "temp");
+          } else {
+            // Eski resim URL'ini koru
+            preImageUrl = initialValues?.preImage || null;
+          }
+        } else {
+          // Resim kapalıysa eski URL'yi koru
+          preImageUrl = initialValues?.preImage || null;
+        }
+      } else {
+        // Yeni kategori modunda: dosyaları yükle
+        if (showSlider && sliderFiles.length > 0) {
+          sliderImageUrls = await Promise.all(
+            sliderFiles.map((file) =>
+              file ? uploadFileToStorage(file, `sliders`, "temp") : null
+            )
+          );
+          sliderImageUrls = sliderImageUrls.filter((url) => url !== null);
+        }
+        if (showPreAudio && preAudio) {
+          preAudioUrl = await uploadFileToStorage(preAudio, `audios`, "temp");
+        }
+        if (showPreImage && preImage) {
+          preImageUrl = await uploadFileToStorage(preImage, `images`, "temp");
+        }
       }
+
+      // Kategori verilerini hazırla
       const categoryData = {
         ...data,
         durum: data.durum,
-        sliderImages: showSlider ? sliderImageUrls : [],
+        sliderImages: sliderImageUrls,
         kategoriBaslarkenMetin: !!showPreText,
         kategoriBaslarkenSes: !!showPreAudio,
         kategoriBaslarkenResim: !!showPreImage,
@@ -181,11 +238,11 @@ const KategoriFormu = ({ initialValues, onSubmit: onSubmitProp, isEdit }) => {
         kategoriBaslarkenGeriyeSayim: !!showCountdown,
         sesOtomatikOynatilsin: showPreAudio ? autoPlayAudio : false,
         preText: showPreText ? preText : null,
-        preAudio: showPreAudio ? preAudioUrl : null,
-        preImage: showPreImage ? preImageUrl : null,
+        preAudio: preAudioUrl,
+        preImage: preImageUrl,
         countdownSeconds: showCountdown ? countdownSeconds : null,
-        createdAt: new Date().toISOString(),
       };
+
       if (onSubmitProp) {
         await onSubmitProp(categoryData, reset);
       } else {
@@ -207,144 +264,145 @@ const KategoriFormu = ({ initialValues, onSubmit: onSubmitProp, isEdit }) => {
       setAutoPlayAudio(false);
       setLoading(false);
     } catch (error) {
-      toast.error("Kategori kaydedilirken bir hata oluştu!");
+      // Backend'ten gelen hata mesajını göster
+      console.error("Kategori kaydetme hatası:", error);
+      const errorMessage =
+        error?.message || "Kategori kaydedilirken bir hata oluştu!";
+      toast.error(errorMessage);
       setLoading(false);
     }
   };
 
   return (
-    <FormTemplate
-      onSubmit={handleSubmit(onSubmit)}
-      submitText={isEdit ? "Kaydet" : "Kategori Ekle"}
-      loadingText={isEdit ? "Kaydediliyor..." : "Ekleniyor..."}
-      loading={loading}
-    >
-      {/* Checkboxlar en üstte, yan yana */}
-      <div className="w-[750px] flex flex-row flex-wrap gap-4">
-        <CustomCheckbox
-          checked={showPreText}
-          onChange={onPreTextCheckboxChange}
-          label="Kategori başlarken metin gösterilsin"
-          name="showPreText"
-        />
-        <CustomCheckbox
-          checked={showPreAudio}
-          onChange={onPreAudioCheckboxChange}
-          label="Kategori başlarken ses çalsın"
-          name="showPreAudio"
-        />
-        <CustomCheckbox
-          checked={showPreImage}
-          onChange={onPreImageCheckboxChange}
-          label="Kategori başlarken resim gösterilsin"
-          name="showPreImage"
-        />
-        <CustomCheckbox
-          checked={showSlider}
-          onChange={onSliderCheckboxChange}
-          label="Kategori başlarken slider gösterilsin"
-          name="showSlider"
-        />
-        <CustomCheckbox
-          checked={showCountdown}
-          onChange={onCountdownCheckboxChange}
-          label="Kategori başlarken geriye sayım yapılsın"
-          name="showCountdown"
-        />
-      </div>
-      {/* Tüm form inputları ve grupları tek bir dikey blokta, eşit aralıklı */}
-      <div className="flex flex-col w-[750px] gap-y-4">
-        {/* Ana form alanları */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-          <Controller
-            name="kategoriAdi"
-            control={control}
-            render={({ field }) => (
-              <FormField
-                label="Kategori Adı"
-                placeholder="Örn: Görsel Hafıza"
-                error={errors.kategoriAdi?.message}
-                delay={0.1}
-                className="w-full"
-                {...field}
-              />
-            )}
+    <div className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Checkboxlar en üstte, yan yana */}
+        <div className="w-[750px] flex flex-row flex-wrap gap-4">
+          <CustomCheckbox
+            checked={showPreText}
+            onChange={onPreTextCheckboxChange}
+            label="Kategori başlarken metin gösterilsin"
+            name="showPreText"
           />
-          <Controller
-            name="durum"
-            control={control}
-            render={({ field }) => (
-              <CustomDropdown
-                label="Durum"
-                options={statusOptions}
-                error={errors.durum?.message}
-                delay={0.2}
-                className="w-full"
-                {...field}
-              />
-            )}
+          <CustomCheckbox
+            checked={showPreAudio}
+            onChange={onPreAudioCheckboxChange}
+            label="Kategori başlarken ses çalsın"
+            name="showPreAudio"
           />
-          <div className="md:col-span-2">
+          <CustomCheckbox
+            checked={showPreImage}
+            onChange={onPreImageCheckboxChange}
+            label="Kategori başlarken resim gösterilsin"
+            name="showPreImage"
+          />
+          <CustomCheckbox
+            checked={showSlider}
+            onChange={onSliderCheckboxChange}
+            label="Kategori başlarken slider gösterilsin"
+            name="showSlider"
+          />
+          <CustomCheckbox
+            checked={showCountdown}
+            onChange={onCountdownCheckboxChange}
+            label="Kategori başlarken geriye sayım yapılsın"
+            name="showCountdown"
+          />
+        </div>
+        {/* Tüm form inputları ve grupları tek bir dikey blokta, eşit aralıklı */}
+        <div className="flex flex-col w-[750px] gap-y-4">
+          {/* Ana form alanları */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
             <Controller
-              name="aciklama"
+              name="kategoriAdi"
               control={control}
               render={({ field }) => (
                 <FormField
-                  label="Açıklama (Opsiyonel)"
-                  type="textarea"
-                  placeholder="Kısa açıklama (kullanıcı görmez, en fazla 200 karakter)"
-                  error={errors.aciklama?.message}
-                  delay={0.3}
-                  maxLength={200}
+                  label="Kategori Adı"
+                  placeholder="Örn: Görsel Hafıza"
+                  error={errors.kategoriAdi?.message}
+                  delay={0.1}
                   className="w-full"
                   {...field}
                 />
               )}
             />
-          </div>
-        </div>
-        {/* Seçili olanların inputları formun en altında, submit üstünde */}
-        {(showPreText ||
-          showPreAudio ||
-          showPreImage ||
-          showSlider ||
-          showCountdown) && (
-          <div className="flex flex-col w-full gap-y-4">
-            {showPreText && (
-              <FormField
-                label="Kategori başlarken gösterilecek metin"
-                type="textarea"
-                value={preText}
-                onChange={(e) => setPreText(e.target.value)}
-                delay={0.1}
-                className="w-full"
-              />
-            )}
-            {showPreAudio && (
-              <div className="flex flex-row gap-4 items-center w-full">
-                {/* Ses dosyası önizlemesi - input ile yan yana, %50 %50 */}
-                {initialValues && (
-                  <div className="w-full flex items-center justify-center">
-                    {initialValues.preAudio &&
-                      typeof initialValues.preAudio === "string" && (
-                        <audio
-                          controls
-                          src={initialValues.preAudio}
-                          className="w-full h-10"
-                        />
-                      )}
-                  </div>
-                )}
-                <div className="w-full">
+            <Controller
+              name="durum"
+              control={control}
+              render={({ field }) => (
+                <CustomDropdown
+                  label="Durum"
+                  options={statusOptions}
+                  error={errors.durum?.message}
+                  delay={0.2}
+                  className="w-full"
+                  {...field}
+                />
+              )}
+            />
+            <div className="md:col-span-2">
+              <Controller
+                name="aciklama"
+                control={control}
+                render={({ field }) => (
                   <FormField
-                    label="Kategori başlarken ses"
-                    type="file"
-                    accept="audio/*"
-                    onChange={(e) => setPreAudio(e.target.files[0])}
-                    delay={0.1}
-                    className="w-full mb-2"
+                    label="Açıklama (Opsiyonel)"
+                    type="textarea"
+                    placeholder="Kısa açıklama (kullanıcı görmez, en fazla 200 karakter)"
+                    error={errors.aciklama?.message}
+                    delay={0.3}
+                    maxLength={200}
+                    className="w-full"
+                    {...field}
                   />
+                )}
+              />
+            </div>
+          </div>
+          {/* Seçili olanların inputları formun en altında, submit üstünde */}
+          {(showPreText ||
+            showPreAudio ||
+            showPreImage ||
+            showSlider ||
+            showCountdown) && (
+            <div className="flex flex-col w-full gap-y-4">
+              {showPreText && (
+                <FormField
+                  label="Kategori başlarken gösterilecek metin"
+                  type="textarea"
+                  value={preText}
+                  onChange={(e) => setPreText(e.target.value)}
+                  delay={0.1}
+                  className="w-full"
+                />
+              )}
+              {showPreAudio && (
+                <div className="space-y-4">
+                  {/* Mevcut ses dosyası önizlemesi */}
+                  {initialValues?.preAudio && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Mevcut Ses Dosyası
+                      </label>
+                      <audio
+                        controls
+                        src={`http://localhost/OkulQuiz/backend/${initialValues.preAudio}`}
+                        className="w-full h-10"
+                      />
+                    </div>
+                  )}
+
+                  {/* Yeni ses dosyası yükleme */}
                   <div>
+                    <FormField
+                      label="Yeni Ses Dosyası (Değiştirmek için)"
+                      type="file"
+                      accept="audio/*"
+                      onChange={(e) => setPreAudio(e.target.files[0])}
+                      delay={0.1}
+                      className="w-full"
+                    />
                     <CustomCheckbox
                       checked={autoPlayAudio}
                       onChange={onAutoPlayAudioChange}
@@ -353,72 +411,92 @@ const KategoriFormu = ({ initialValues, onSubmit: onSubmitProp, isEdit }) => {
                     />
                   </div>
                 </div>
-              </div>
-            )}
-            {showPreImage && (
-              <div className="flex items-center justify-center gap-4">
-                {/* Resim önizlemesi - küçük ve yanında, tıklanınca yeni sekmede */}
-                {initialValues &&
-                  initialValues.preImage &&
-                  typeof initialValues.preImage === "string" && (
-                    <a
-                      href={initialValues.preImage}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block"
-                    >
-                      <img
-                        src={initialValues.preImage}
-                        alt="Kategori resmi"
-                        className="w-20 h-20 rounded shadow-sm"
-                      />
-                    </a>
+              )}
+              {showPreImage && (
+                <div className="space-y-4">
+                  {/* Mevcut resim önizlemesi */}
+                  {initialValues?.preImage && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Mevcut Resim
+                      </label>
+                      <div className="flex justify-center">
+                        <a
+                          href={`http://localhost/OkulQuiz/backend/${initialValues.preImage}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block"
+                        >
+                          <img
+                            src={`http://localhost/OkulQuiz/backend/${initialValues.preImage}`}
+                            alt="Kategori resmi"
+                            className="w-32 h-32 object-cover rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                          />
+                        </a>
+                      </div>
+                    </div>
                   )}
-                <div className="flex-1">
+
+                  {/* Yeni resim yükleme */}
+                  <div>
+                    <FormField
+                      label="Yeni Resim (Değiştirmek için)"
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setPreImage(e.target.files[0])}
+                      delay={0.1}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              )}
+              {showSlider && (
+                <>
                   <FormField
-                    label="Kategori başlarken resim"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setPreImage(e.target.files[0])}
+                    label="Slider Resim Sayısı"
+                    type="number"
+                    min={1}
+                    value={sliderCount}
+                    onChange={onSliderCountChange}
                     delay={0.1}
                     className="w-full"
                   />
-                </div>
-              </div>
-            )}
-            {showSlider && (
-              <>
-                <FormField
-                  label="Slider Resim Sayısı"
-                  type="number"
-                  min={1}
-                  value={sliderCount}
-                  onChange={onSliderCountChange}
-                  delay={0.1}
-                  className="w-full"
-                />
-                <div className="flex flex-col gap-y-4 w-full">
-                  {Array.from({ length: sliderCount }).map((_, idx) => (
-                    <div key={idx} className="flex flex-row items-center gap-4">
-                      {/* Slider resmi önizlemesi inputun yanında */}
-                      {initialValues &&
-                        Array.isArray(initialValues.sliderImages) &&
-                        initialValues.sliderImages[idx] && (
-                          <a
-                            href={initialValues.sliderImages[idx]}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block"
-                          >
-                            <img
-                              src={initialValues.sliderImages[idx]}
-                              alt={`Slider Resim ${idx + 1}`}
-                              className="w-20 h-20 rounded shadow-sm"
-                            />
-                          </a>
-                        )}
-                      <div className="flex-1">
+                  <div className="space-y-4">
+                    {/* Mevcut slider resimleri */}
+                    {initialValues?.sliderImages &&
+                      initialValues.sliderImages.length > 0 && (
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Mevcut Slider Resimleri
+                          </label>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {initialValues.sliderImages.map((imageUrl, idx) => (
+                              <a
+                                key={idx}
+                                href={`http://localhost/OkulQuiz/backend/${imageUrl}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block"
+                              >
+                                <img
+                                  src={`http://localhost/OkulQuiz/backend/${imageUrl}`}
+                                  alt={`Slider Resim ${idx + 1}`}
+                                  className="w-full h-24 object-cover rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Yeni slider resimleri */}
+                    <div className="space-y-3">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Yeni Slider Resimleri (Değiştirmek için)
+                      </label>
+                      {Array.from({ length: sliderCount }).map((_, idx) => (
                         <FormField
+                          key={idx}
                           label={`Slider Resim ${idx + 1}`}
                           type="file"
                           accept="image/*"
@@ -426,29 +504,69 @@ const KategoriFormu = ({ initialValues, onSubmit: onSubmitProp, isEdit }) => {
                             onSliderFileChange(idx, e.target.files[0])
                           }
                           delay={0.2 + idx * 0.05}
-                          className=""
+                          className="w-full"
                         />
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </>
+                  </div>
+                </>
+              )}
+              {showCountdown && (
+                <FormField
+                  label="Kaç saniye geriye sayım yapılsın?"
+                  type="number"
+                  min={1}
+                  value={countdownSeconds}
+                  onChange={onCountdownSecondsChange}
+                  delay={0.1}
+                  className="w-full"
+                />
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Submit Button */}
+        <div className="flex justify-center pt-4">
+          <button
+            type="submit"
+            disabled={loading}
+            className={`px-6 cursor-pointer py-3 rounded-lg bg-blue-600 text-white font-semibold 
+            ${
+              loading
+                ? "opacity-70 cursor-not-allowed"
+                : "hover:bg-blue-700 hover:scale-105"
+            } 
+            transition-all duration-200`}
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                {isEdit ? "Kaydediliyor..." : "Ekleniyor..."}
+              </span>
+            ) : isEdit ? (
+              "Kaydet"
+            ) : (
+              "Kategori Ekle"
             )}
-            {showCountdown && (
-              <FormField
-                label="Kaç saniye geriye sayım yapılsın?"
-                type="number"
-                min={1}
-                value={countdownSeconds}
-                onChange={onCountdownSecondsChange}
-                delay={0.1}
-                className="w-full"
-              />
-            )}
-          </div>
-        )}
-      </div>
-    </FormTemplate>
+          </button>
+        </div>
+      </form>
+    </div>
   );
 };
 

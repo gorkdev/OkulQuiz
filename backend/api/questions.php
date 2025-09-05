@@ -64,12 +64,17 @@ try {
             break;
 
         case 'POST':
-            // Yeni soru ekle
-            $input = json_decode(file_get_contents('php://input'), true);
-            if (!$input) {
-                ResponseHandler::error('Geçersiz JSON verisi', 400);
+            // Yeni soru ekle (JSON veya multipart)
+            $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+            if (stripos($contentType, 'multipart/form-data') !== false) {
+                $questionService->addQuestionWithFiles($_POST, $_FILES);
+            } else {
+                $input = json_decode(file_get_contents('php://input'), true);
+                if (!$input) {
+                    ResponseHandler::error('Geçersiz JSON verisi', 400);
+                }
+                $questionService->addQuestion($input);
             }
-            $questionService->addQuestion($input);
             break;
 
         case 'PUT':

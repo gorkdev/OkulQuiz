@@ -32,17 +32,95 @@ class CategoryService
                 ResponseHandler::error('Bu kategori adı zaten kullanılıyor', 400);
             }
 
-            $sql = "INSERT INTO kategoriler (kategori_adi, aciklama, durum, created_at) 
-                    VALUES (:kategori_adi, :aciklama, :durum, NOW())";
+            $sql = "INSERT INTO kategoriler (
+                        kategori_adi, aciklama, durum, 
+                        kategori_baslarken_metin, kategori_baslarken_ses, kategori_baslarken_resim,
+                        kategori_baslarken_slider, kategori_baslarken_geriye_sayim, ses_otomatik_oynatilsin,
+                        pre_text, pre_audio_url, pre_image_url, slider_images, countdown_seconds,
+                        created_at
+                    ) VALUES (
+                        :kategori_adi, :aciklama, :durum,
+                        :kategori_baslarken_metin, :kategori_baslarken_ses, :kategori_baslarken_resim,
+                        :kategori_baslarken_slider, :kategori_baslarken_geriye_sayim, :ses_otomatik_oynatilsin,
+                        :pre_text, :pre_audio_url, :pre_image_url, :slider_images, :countdown_seconds,
+                        NOW()
+                    )";
 
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
                 ':kategori_adi' => $categoryData['kategoriAdi'],
                 ':aciklama' => $categoryData['aciklama'] ?? null,
-                ':durum' => $categoryData['durum'] ?? 'aktif'
+                ':durum' => $categoryData['durum'] ?? 'aktif',
+                ':kategori_baslarken_metin' => $categoryData['kategoriBaslarkenMetin'] ?? false,
+                ':kategori_baslarken_ses' => $categoryData['kategoriBaslarkenSes'] ?? false,
+                ':kategori_baslarken_resim' => $categoryData['kategoriBaslarkenResim'] ?? false,
+                ':kategori_baslarken_slider' => $categoryData['kategoriBaslarkenSlider'] ?? false,
+                ':kategori_baslarken_geriye_sayim' => $categoryData['kategoriBaslarkenGeriyeSayim'] ?? false,
+                ':ses_otomatik_oynatilsin' => $categoryData['sesOtomatikOynatilsin'] ?? false,
+                ':pre_text' => $categoryData['preText'] ?? null,
+                ':pre_audio_url' => $categoryData['preAudio'] ?? null,
+                ':pre_image_url' => $categoryData['preImage'] ?? null,
+                ':slider_images' => isset($categoryData['sliderImages']) ? json_encode($categoryData['sliderImages']) : null,
+                ':countdown_seconds' => $categoryData['countdownSeconds'] ?? null
             ]);
 
             $categoryId = $this->db->lastInsertId();
+
+            // Dosya URL'lerini güncelle (temp'den gerçek ID'ye)
+            if ($categoryId && ($categoryData['preAudio'] || $categoryData['preImage'] || !empty($categoryData['sliderImages']))) {
+                $updateFields = [];
+                $params = [':id' => $categoryId];
+
+                if (!empty($categoryData['preAudio'])) {
+                    $oldPath = "../uploads/categories/category_temp/audios/" . basename($categoryData['preAudio']);
+                    $newDir = "../uploads/categories/category_{$categoryId}/audios/";
+                    if (!is_dir($newDir)) {
+                        mkdir($newDir, 0755, true);
+                    }
+                    $newPath = $newDir . basename($categoryData['preAudio']);
+                    if (file_exists($oldPath)) {
+                        rename($oldPath, $newPath);
+                    }
+                    $updateFields[] = "pre_audio_url = :pre_audio_url";
+                    $params[':pre_audio_url'] = str_replace('category_temp', "category_{$categoryId}", $categoryData['preAudio']);
+                }
+                if (!empty($categoryData['preImage'])) {
+                    $oldPath = "../uploads/categories/category_temp/images/" . basename($categoryData['preImage']);
+                    $newDir = "../uploads/categories/category_{$categoryId}/images/";
+                    if (!is_dir($newDir)) {
+                        mkdir($newDir, 0755, true);
+                    }
+                    $newPath = $newDir . basename($categoryData['preImage']);
+                    if (file_exists($oldPath)) {
+                        rename($oldPath, $newPath);
+                    }
+                    $updateFields[] = "pre_image_url = :pre_image_url";
+                    $params[':pre_image_url'] = str_replace('category_temp', "category_{$categoryId}", $categoryData['preImage']);
+                }
+                if (!empty($categoryData['sliderImages'])) {
+                    $updatedSliderImages = [];
+                    foreach ($categoryData['sliderImages'] as $url) {
+                        $oldPath = "../uploads/categories/category_temp/sliders/" . basename($url);
+                        $newDir = "../uploads/categories/category_{$categoryId}/sliders/";
+                        if (!is_dir($newDir)) {
+                            mkdir($newDir, 0755, true);
+                        }
+                        $newPath = $newDir . basename($url);
+                        if (file_exists($oldPath)) {
+                            rename($oldPath, $newPath);
+                        }
+                        $updatedSliderImages[] = str_replace('category_temp', "category_{$categoryId}", $url);
+                    }
+                    $updateFields[] = "slider_images = :slider_images";
+                    $params[':slider_images'] = json_encode($updatedSliderImages);
+                }
+
+                if (!empty($updateFields)) {
+                    $sql = "UPDATE kategoriler SET " . implode(', ', $updateFields) . " WHERE id = :id";
+                    $stmt = $this->db->prepare($sql);
+                    $stmt->execute($params);
+                }
+            }
 
             // Log kaydı
             $this->addLog('Yeni Kategori Eklendi', "{$categoryData['kategoriAdi']} adlı kategori eklendi.");
@@ -104,7 +182,7 @@ class CategoryService
             $totalCount = $countStmt->fetch()['total'];
 
             // Sayfalı verileri al
-            $sql = "SELECT * FROM kategoriler {$whereClause} ORDER BY kategori_adi ASC LIMIT :limit OFFSET :offset";
+            $sql = "SELECT * FROM kategoriler {$whereClause} ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset";
             $stmt = $this->db->prepare($sql);
 
             // Arama parametrelerini bind et
@@ -165,7 +243,7 @@ class CategoryService
             $totalCount = $countStmt->fetch()['total'];
 
             // Sayfalı verileri al
-            $sql = "SELECT * FROM kategoriler {$whereClause} ORDER BY kategori_adi ASC LIMIT :limit OFFSET :offset";
+            $sql = "SELECT * FROM kategoriler {$whereClause} ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset";
             $stmt = $this->db->prepare($sql);
 
             // Arama parametrelerini bind et
@@ -250,13 +328,29 @@ class CategoryService
             $fieldMappings = [
                 'kategoriAdi' => 'kategori_adi',
                 'aciklama' => 'aciklama',
-                'durum' => 'durum'
+                'durum' => 'durum',
+                'kategoriBaslarkenMetin' => 'kategori_baslarken_metin',
+                'kategoriBaslarkenSes' => 'kategori_baslarken_ses',
+                'kategoriBaslarkenResim' => 'kategori_baslarken_resim',
+                'kategoriBaslarkenSlider' => 'kategori_baslarken_slider',
+                'kategoriBaslarkenGeriyeSayim' => 'kategori_baslarken_geriye_sayim',
+                'sesOtomatikOynatilsin' => 'ses_otomatik_oynatilsin',
+                'preText' => 'pre_text',
+                'preAudio' => 'pre_audio_url',
+                'preImage' => 'pre_image_url',
+                'sliderImages' => 'slider_images',
+                'countdownSeconds' => 'countdown_seconds'
             ];
 
             foreach ($fieldMappings as $inputField => $dbField) {
-                if (isset($categoryData[$inputField])) {
+                if (isset($categoryData[$inputField]) && $categoryData[$inputField] !== null && $categoryData[$inputField] !== '') {
                     $updateFields[] = "{$dbField} = :{$dbField}";
-                    $params[":{$dbField}"] = $categoryData[$inputField];
+                    // SliderImages için JSON encode
+                    if ($inputField === 'sliderImages') {
+                        $params[":{$dbField}"] = json_encode($categoryData[$inputField]);
+                    } else {
+                        $params[":{$dbField}"] = $categoryData[$inputField];
+                    }
                 }
             }
 
@@ -267,6 +361,90 @@ class CategoryService
             $sql = "UPDATE kategoriler SET " . implode(', ', $updateFields) . " WHERE id = :id";
             $stmt = $this->db->prepare($sql);
             $stmt->execute($params);
+
+            // Dosya URL'lerini güncelle (temp'den gerçek ID'ye veya eski URL'leri koru)
+            if (
+                ($categoryData['preAudio'] && strpos($categoryData['preAudio'], 'category_temp') !== false) ||
+                ($categoryData['preImage'] && strpos($categoryData['preImage'], 'category_temp') !== false) ||
+                (!empty($categoryData['sliderImages']) && strpos(json_encode($categoryData['sliderImages']), 'category_temp') !== false) ||
+                isset($categoryData['preAudio']) || isset($categoryData['preImage']) || isset($categoryData['sliderImages'])
+            ) {
+
+                $updateFileFields = [];
+                $fileParams = [':id' => $categoryId];
+
+                if (!empty($categoryData['preAudio'])) {
+                    if (strpos($categoryData['preAudio'], 'category_temp') !== false) {
+                        // Yeni dosya: temp'den gerçek klasöre taşı
+                        $oldPath = "../uploads/categories/category_temp/audios/" . basename($categoryData['preAudio']);
+                        $newDir = "../uploads/categories/category_{$categoryId}/audios/";
+                        if (!is_dir($newDir)) {
+                            mkdir($newDir, 0755, true);
+                        }
+                        $newPath = $newDir . basename($categoryData['preAudio']);
+                        if (file_exists($oldPath)) {
+                            rename($oldPath, $newPath);
+                        }
+                        $updateFileFields[] = "pre_audio_url = :pre_audio_url";
+                        $fileParams[':pre_audio_url'] = str_replace('category_temp', "category_{$categoryId}", $categoryData['preAudio']);
+                    } else {
+                        // Eski dosya: URL'yi koru
+                        $updateFileFields[] = "pre_audio_url = :pre_audio_url";
+                        $fileParams[':pre_audio_url'] = $categoryData['preAudio'];
+                    }
+                }
+
+                if (!empty($categoryData['preImage'])) {
+                    if (strpos($categoryData['preImage'], 'category_temp') !== false) {
+                        // Yeni dosya: temp'den gerçek klasöre taşı
+                        $oldPath = "../uploads/categories/category_temp/images/" . basename($categoryData['preImage']);
+                        $newDir = "../uploads/categories/category_{$categoryId}/images/";
+                        if (!is_dir($newDir)) {
+                            mkdir($newDir, 0755, true);
+                        }
+                        $newPath = $newDir . basename($categoryData['preImage']);
+                        if (file_exists($oldPath)) {
+                            rename($oldPath, $newPath);
+                        }
+                        $updateFileFields[] = "pre_image_url = :pre_image_url";
+                        $fileParams[':pre_image_url'] = str_replace('category_temp', "category_{$categoryId}", $categoryData['preImage']);
+                    } else {
+                        // Eski dosya: URL'yi koru
+                        $updateFileFields[] = "pre_image_url = :pre_image_url";
+                        $fileParams[':pre_image_url'] = $categoryData['preImage'];
+                    }
+                }
+
+                if (!empty($categoryData['sliderImages'])) {
+                    $updatedSliderImages = [];
+                    foreach ($categoryData['sliderImages'] as $url) {
+                        if (strpos($url, 'category_temp') !== false) {
+                            // Yeni dosya: temp'den gerçek klasöre taşı
+                            $oldPath = "../uploads/categories/category_temp/sliders/" . basename($url);
+                            $newDir = "../uploads/categories/category_{$categoryId}/sliders/";
+                            if (!is_dir($newDir)) {
+                                mkdir($newDir, 0755, true);
+                            }
+                            $newPath = $newDir . basename($url);
+                            if (file_exists($oldPath)) {
+                                rename($oldPath, $newPath);
+                            }
+                            $updatedSliderImages[] = str_replace('category_temp', "category_{$categoryId}", $url);
+                        } else {
+                            // Eski dosya: URL'yi koru
+                            $updatedSliderImages[] = $url;
+                        }
+                    }
+                    $updateFileFields[] = "slider_images = :slider_images";
+                    $fileParams[':slider_images'] = json_encode($updatedSliderImages);
+                }
+
+                if (!empty($updateFileFields)) {
+                    $fileSql = "UPDATE kategoriler SET " . implode(', ', $updateFileFields) . " WHERE id = :id";
+                    $fileStmt = $this->db->prepare($fileSql);
+                    $fileStmt->execute($fileParams);
+                }
+            }
 
             // Log kaydı
             $this->addLog('Kategori Güncellendi', "{$categoryData['kategoriAdi']} adlı kategori güncellendi.");
@@ -361,7 +539,7 @@ class CategoryService
     public function getAllActiveCategories()
     {
         try {
-            $sql = "SELECT * FROM kategoriler WHERE durum = 'aktif' ORDER BY kategori_adi ASC";
+            $sql = "SELECT * FROM kategoriler WHERE durum = 'aktif' ORDER BY created_at DESC, id DESC";
             $stmt = $this->db->prepare($sql);
             $stmt->execute();
 
@@ -393,6 +571,26 @@ class CategoryService
 
         } catch (Exception $e) {
             throw new Exception('Kategori soru sayısı getirilirken hata oluştu: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Kategori ID'ye göre soru sayısını getirir
+     * @param int $categoryId - Kategori ID'si
+     * @return int - Soru sayısı
+     */
+    public function getQuestionCountByCategoryId($categoryId)
+    {
+        try {
+            $sql = "SELECT COUNT(*) as question_count FROM sorular WHERE kategori_id = :category_id";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([':category_id' => $categoryId]);
+
+            $result = $stmt->fetch();
+            return (int) ($result['question_count'] ?? 0);
+
+        } catch (Exception $e) {
+            throw new Exception('Kategori (ID) soru sayısı getirilirken hata oluştu: ' . $e->getMessage());
         }
     }
 

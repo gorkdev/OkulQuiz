@@ -37,6 +37,11 @@ try {
                 // Kategori adına göre soru sayısını getir
                 $questionCount = $categoryService->getQuestionCountByCategoryName($_GET['category_name']);
                 ResponseHandler::success(['question_count' => $questionCount], 'Kategori soru sayısı getirildi');
+            } elseif (isset($_GET['category_id'])) {
+                // Kategori ID'ye göre soru sayısını getir
+                $categoryId = (int) $_GET['category_id'];
+                $questionCount = $categoryService->getQuestionCountByCategoryId($categoryId);
+                ResponseHandler::success(['question_count' => $questionCount], 'Kategori (ID) soru sayısı getirildi');
             } elseif (isset($_GET['page'])) {
                 // Sayfalı kategoriler getir
                 $page = (int) $_GET['page'];
